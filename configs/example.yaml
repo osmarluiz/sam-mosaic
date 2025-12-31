@@ -1,0 +1,102 @@
+# SAM-Mosaic Configuration Example
+# =================================
+# This file configures the full segmentation pipeline.
+# See docs/configuration.md for detailed parameter descriptions.
+
+# ------------------------------------------------------------------------------
+# INPUT
+# ------------------------------------------------------------------------------
+input:
+  image_path: "data/image.tif"       # Path to input image
+                                      # Supported: PNG, JPEG, TIFF, GeoTIFF, ENVI
+
+# ------------------------------------------------------------------------------
+# TILING
+# ------------------------------------------------------------------------------
+tiling:
+  tile_size: 2000                     # Tile size in pixels (e.g., 2000×2000)
+
+# ------------------------------------------------------------------------------
+# SAM MODEL
+# ------------------------------------------------------------------------------
+sam:
+  model_config: "configs/sam2.1/sam2.1_hiera_l.yaml"
+  checkpoint: "models/sam2.1_hiera_large.pt"
+  device: "cuda"                      # "cuda" or "cpu"
+  min_mask_area: 1000                 # Minimum mask area in pixels
+  box_nms_thresh: 0.7                 # NMS threshold for bounding boxes
+
+# ------------------------------------------------------------------------------
+# BAND 0: BASE TILES
+# ------------------------------------------------------------------------------
+base_tiles:
+  grid:
+    points_per_side: 64               # 64×64 = 4096 points per tile
+
+  cascade:
+    n_passes: 20                      # Number of cascade iterations
+    thresholds:
+      iou: [0.92, 0.56]               # [start, end] - decreases each pass
+      stability: [0.95, 0.59]         # [start, end] - decreases each pass
+
+# ------------------------------------------------------------------------------
+# BANDS 1 & 2: BORDER CORRECTION
+# ------------------------------------------------------------------------------
+border_correction:
+  zone_width: 100                     # Width of point concentration zone (pixels)
+
+  # V tiles: vertical discontinuities
+  v_tiles:
+    grid:
+      n_across: 5                     # Columns crossing the discontinuity
+      n_along: 100                    # Rows along the discontinuity
+                                      # Total: 5 × 100 = 500 points
+    cascade:
+      n_passes: 5
+      thresholds:
+        iou: [0.88, 0.70]
+        stability: [0.92, 0.75]
+
+  # H tiles: horizontal discontinuities
+  h_tiles:
+    grid:
+      n_across: 5                     # Rows crossing the discontinuity
+      n_along: 100                    # Columns along the discontinuity
+                                      # Total: 100 × 5 = 500 points
+    cascade:
+      n_passes: 5
+      thresholds:
+        iou: [0.88, 0.70]
+        stability: [0.92, 0.75]
+
+  # Corner tiles: V+H intersections
+  corner_tiles:
+    grid:
+      n_x: 5                          # Columns in grid
+      n_y: 5                          # Rows in grid
+                                      # Total: 5 × 5 = 25 points
+    cascade:
+      n_passes: 5
+      thresholds:
+        iou: [0.88, 0.70]
+        stability: [0.92, 0.75]
+
+# ------------------------------------------------------------------------------
+# MERGE
+# ------------------------------------------------------------------------------
+merge:
+  strategy: "priority"                # Band2 > Band1 > Band0
+
+# ------------------------------------------------------------------------------
+# OUTPUT
+# ------------------------------------------------------------------------------
+output:
+  dir: "output/"                      # Output directory
+
+  save_bands: true                    # Save individual bands (band0.tif, etc.)
+  save_passes: false                  # Save each cascade pass (debug)
+
+  vectorize:
+    enabled: true                     # Convert to vector format
+    format: "shapefile"               # "shapefile", "geopackage", or "geojson"
+    simplify_tolerance: 0             # Simplify geometries (0 = no simplification)
