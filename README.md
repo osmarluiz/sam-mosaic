@@ -17,7 +17,7 @@ SAM-Mosaic solves the problem of segmenting large images (e.g., 15000×30000 pix
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/sam-mosaic.git
+git clone https://github.com/osmarluiz/sam-mosaic.git
 cd sam-mosaic
 pip install -e .
 ```
@@ -272,9 +272,9 @@ If you use this work, please cite:
 ```bibtex
 @software{sam_mosaic,
   title = {SAM-Mosaic: Large Image Segmentation with SAM},
-  author = {Your Name},
-  year = {2024},
-  url = {https://github.com/yourusername/sam-mosaic}
+  author = {Osmar Cavalho},
+  year = {2025},
+  url = {https://github.com/osmarluiz/sam-mosaic}
 }
 ```
 
