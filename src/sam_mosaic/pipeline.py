@@ -13,15 +13,18 @@ from sam_mosaic.io.writer import save_raster, save_labels
 from sam_mosaic.tiling.grid import TileGrid
 from sam_mosaic.tiling.borders import BorderTiles
 from sam_mosaic.points.grids import (
-    make_uniform_grid, make_v_grid, make_h_grid, make_corner_grid, filter_by_mask
+    make_uniform_grid, make_v_grid, make_h_grid, make_corner_grid,
+    filter_by_mask, make_zone_kmeans_points
 )
 from sam_mosaic.segmentation.sam import SAMPredictor
 from sam_mosaic.segmentation.cascade import (
     run_cascade_on_tile, masks_to_labels,
     run_single_pass, save_combined_mask, load_combined_mask
 )
+from sam_mosaic.segmentation.sam import apply_black_mask
 from sam_mosaic.merge.bands import merge_bands, stitch_tile_labels
 from sam_mosaic.vectorize.polygonize import masks_to_polygons, save_shapefile, save_geopackage
+from sam_mosaic.postprocess import postprocess_base_labels
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +91,37 @@ class Pipeline:
         logger.info("Stage 1: Processing base tiles")
         band0, next_label = self._process_base_tiles(input_path, grid, output_dir)
         logger.info(f"Stage 1 complete: {next_label - 1} labels")
+
+        # Stage 1.5: Post-processing base tiles
+        pp_cfg = self.config.base_tiles.postprocess
+        if pp_cfg.enabled:
+            logger.info("Stage 1.5: Post-processing base tiles")
+            logger.info(f"  - Remove masks < {pp_cfg.min_area} px")
+            logger.info(f"  - Merge enclosed masks < {pp_cfg.max_enclosed_area} px")
+            logger.info(f"  - Edge completion up to {pp_cfg.edge_max_distance} px")
+
+            band0_processed = postprocess_base_labels(
+                band0,
+                tile_size=self.config.tiling.tile_size,
+                min_area=pp_cfg.min_area,
+                max_enclosed_area=pp_cfg.max_enclosed_area,
+                edge_max_distance=pp_cfg.edge_max_distance
+            )
+
+            # Save both versions if intermediate saving is enabled
+            if self.config.output.save_intermediate:
+                # Original is already saved in _process_base_tiles
+                save_labels(
+                    band0_processed,
+                    output_dir / "band0_base_processed.tif",
+                    crs=self._metadata.crs,
+                    transform=self._metadata.transform
+                )
+                logger.info(f"Saved post-processed base: band0_base_processed.tif")
+
+            # Use processed version for subsequent stages
+            band0 = band0_processed
+            logger.info("Stage 1.5 complete")
 
         # Stage 2: V/H border correction (continues label numbering)
         logger.info("Stage 2: Processing V/H borders")
@@ -173,38 +207,28 @@ class Pipeline:
         # Global label counter (starts at 1, 0 = background)
         current_label = 1
 
-        # Process pass by pass
+        # Process tile by tile, all passes per tile (reduces I/O)
         n_passes = cfg.cascade.n_passes
+        logger.info(f"Processing {len(tiles)} base tiles ({n_passes} passes each)")
 
-        for pass_idx in tqdm(range(n_passes), desc="Passes", unit="pass"):
-            iou_thresh, _ = cfg.cascade.thresholds.interpolate(pass_idx, n_passes)
-            total_coverage = 0.0
-            pass_new_masks = 0
+        for tile in tqdm(tiles, desc="Base Tiles", unit="tile"):
+            tile_id = f"tile_{tile.row}_{tile.col}"
+            mask_path = state_dir / f"{tile_id}_mask.npy"
+            labels_path = labels_dir / f"{tile_id}_labels.npy"
 
-            tile_pbar = tqdm(tiles, desc=f"  Pass {pass_idx}", leave=False, unit="tile")
+            # Load tile image ONCE per tile
+            tile_img = load_tile(
+                input_path,
+                tile.row, tile.col,
+                self.config.tiling.tile_size
+            )
 
-            for tile in tile_pbar:
-                tile_id = f"tile_{tile.row}_{tile.col}"
-                mask_path = state_dir / f"{tile_id}_mask.npy"
-                labels_path = labels_dir / f"{tile_id}_labels.npy"
+            # Start with empty masks (in memory)
+            combined_mask = np.zeros((tile.height, tile.width), dtype=np.uint8)
+            tile_labels = np.zeros((tile.height, tile.width), dtype=np.uint32)
 
-                # Load tile image
-                tile_img = load_tile(
-                    input_path,
-                    tile.row, tile.col,
-                    self.config.tiling.tile_size
-                )
-
-                # Load combined mask from disk (or create empty)
-                combined_mask = load_combined_mask(mask_path, tile.height, tile.width)
-
-                # Load labels from disk (or create empty)
-                if labels_path.exists():
-                    tile_labels = np.load(labels_path)
-                else:
-                    tile_labels = np.zeros((tile.height, tile.width), dtype=np.uint32)
-
-                # Run single pass
+            for pass_idx in range(n_passes):
+                # Run single pass (uses K-means for pass 1+)
                 new_masks, combined_mask, coverage = run_single_pass(
                     predictor=self.predictor,
                     image=tile_img,
@@ -216,33 +240,17 @@ class Pipeline:
                 )
 
                 # Convert new masks to labels IMMEDIATELY with global IDs
-                # Only fill empty pixels (don't overwrite existing labels)
                 for mask in new_masks:
                     tile_labels[(mask.mask > 0) & (tile_labels == 0)] = current_label
                     current_label += 1
 
-                # Save state to disk
-                save_combined_mask(combined_mask, mask_path)
-                np.save(labels_path, tile_labels)
+                # Early stop if coverage is very high
+                if pass_idx > 0 and coverage > 99.5:
+                    break
 
-                total_coverage += coverage
-                pass_new_masks += len(new_masks)
-                tile_pbar.set_postfix({
-                    "new": len(new_masks),
-                    "cov": f"{coverage:.1f}%"
-                })
-
-            avg_coverage = total_coverage / len(tiles)
-            logger.info(f"Pass {pass_idx}: iou={iou_thresh:.2f}, new_masks={pass_new_masks}, total_labels={current_label-1}, avg_cov={avg_coverage:.1f}%")
-
-            # Save intermediate mosaic if requested
-            if self.config.output.save_intermediate:
-                self._save_labels_mosaic(tiles, labels_dir, output_dir, pass_idx, "base")
-
-            # Early stop if all tiles converged
-            if pass_idx > 0 and avg_coverage > 99.5:
-                logger.info(f"Converged at pass {pass_idx}")
-                break
+            # Save state ONCE per tile
+            save_combined_mask(combined_mask, mask_path)
+            np.save(labels_path, tile_labels)
 
         # Stitch all tile labels into band0
         band0 = np.zeros((height, width), dtype=np.uint32)
@@ -399,99 +407,149 @@ class Pipeline:
                 'filter': lambda m, by=btile.y, dy=btile.disc_y: crosses_h(m.mask, dy, by),
             })
 
-        # Process V tiles pass by pass
+        # Process V tiles - tile by tile, all passes per tile (reduces I/O)
         n_passes_v = v_cfg.cascade.n_passes
-        logger.info(f"Processing {len(v_tiles)} V border tiles")
+        logger.info(f"Processing {len(v_tiles)} V border tiles (fixed grid, {n_passes_v} passes each)")
 
-        for pass_idx in tqdm(range(n_passes_v), desc="V Passes", unit="pass"):
-            pass_new = 0
-            for info in tqdm(v_tile_info, desc=f"  V Pass {pass_idx}", leave=False, unit="tile"):
-                btile = info['btile']
-                tile_id = info['id']
-                mask_path = state_dir_v / f"{tile_id}_mask.npy"
+        for info in tqdm(v_tile_info, desc="V Tiles", unit="tile"):
+            btile = info['btile']
+            tile_id = info['id']
+            mask_path = state_dir_v / f"{tile_id}_mask.npy"
 
-                region = load_region(input_path, btile.x, btile.y, btile.width, btile.height)
-                combined_mask = load_combined_mask(mask_path, btile.height, btile.width)
+            # Load region ONCE per tile
+            region = load_region(input_path, btile.x, btile.y, btile.width, btile.height)
+            combined_mask = np.zeros((btile.height, btile.width), dtype=np.uint8)
 
-                new_masks, combined_mask, coverage = run_single_pass(
-                    predictor=self.predictor,
-                    image=region,
-                    combined_mask=combined_mask,
-                    initial_points=v_points,
-                    config=v_cfg.cascade,
-                    pass_idx=pass_idx,
-                    mask_filter=info['filter']
+            tile_pixels = btile.width * btile.height
+            max_mask_pixels = int(tile_pixels * 0.4)
+
+            for pass_idx in range(n_passes_v):
+                # Get thresholds for this pass (relax progressively)
+                iou_thresh, stability_thresh = v_cfg.cascade.thresholds.interpolate(
+                    pass_idx, n_passes_v
                 )
 
-                save_combined_mask(combined_mask, mask_path)
+                # Select points based on pass number
+                if pass_idx == 0:
+                    # Pass 0: Use fixed grid filtered by mask
+                    valid_points = filter_by_mask(v_points, combined_mask)
+                else:
+                    # Pass 1+: Use K-means restricted to zone
+                    valid_points = make_zone_kmeans_points(
+                        combined_mask,
+                        zone_type="v",
+                        zone_width=zone_width,
+                        n_points=v_cfg.cascade.points_per_pass,
+                        erosion=v_cfg.cascade.point_erosion
+                    )
+
+                if len(valid_points) == 0:
+                    break  # All points covered, done with this tile
+
+                # Apply black mask to already-segmented areas
+                current_image = apply_black_mask(region, combined_mask)
+
+                # Generate masks from selected points
+                new_masks = self.predictor.predict_points_batched(
+                    current_image,
+                    valid_points,
+                    iou_thresh=iou_thresh,
+                    stability_thresh=stability_thresh
+                )
+
+                # Filter only masks that cross the discontinuity
+                new_masks = [m for m in new_masks if info['filter'](m)]
+
+                # Filter out masks that are too large (>40% of tile)
+                new_masks = [m for m in new_masks if m.mask.sum() <= max_mask_pixels]
+
+                # Update combined mask (only with valid masks)
+                for mask in new_masks:
+                    combined_mask = np.maximum(combined_mask, mask.mask)
 
                 # Convert masks to labels IMMEDIATELY
-                # Only fill empty pixels (don't overwrite existing labels)
-                # Skip masks that are too large (>40% of tile)
-                tile_pixels = btile.width * btile.height
-                max_mask_pixels = int(tile_pixels * 0.4)
-
                 for mask in new_masks:
-                    mask_size = mask.mask.sum()
-                    if mask_size > max_mask_pixels:
-                        continue  # Skip oversized masks
-
                     y_end = min(btile.y + mask.mask.shape[0], height)
                     x_end = min(btile.x + mask.mask.shape[1], width)
                     local_mask = mask.mask[:y_end - btile.y, :x_end - btile.x]
-                    region = band1[btile.y:y_end, btile.x:x_end]
-                    region[(local_mask > 0) & (region == 0)] = current_label
+                    band1_region = band1[btile.y:y_end, btile.x:x_end]
+                    band1_region[(local_mask > 0) & (band1_region == 0)] = current_label
                     current_label += 1
-                    pass_new += 1
 
-            logger.debug(f"V Pass {pass_idx}: {pass_new} new masks")
+            # Save combined mask ONCE per tile (for potential resume)
+            save_combined_mask(combined_mask, mask_path)
 
-        # Process H tiles pass by pass
+        # Process H tiles - tile by tile, all passes per tile (reduces I/O)
         n_passes_h = h_cfg.cascade.n_passes
-        logger.info(f"Processing {len(h_tiles)} H border tiles")
+        logger.info(f"Processing {len(h_tiles)} H border tiles (fixed grid, {n_passes_h} passes each)")
 
-        for pass_idx in tqdm(range(n_passes_h), desc="H Passes", unit="pass"):
-            pass_new = 0
-            for info in tqdm(h_tile_info, desc=f"  H Pass {pass_idx}", leave=False, unit="tile"):
-                btile = info['btile']
-                tile_id = info['id']
-                mask_path = state_dir_h / f"{tile_id}_mask.npy"
+        for info in tqdm(h_tile_info, desc="H Tiles", unit="tile"):
+            btile = info['btile']
+            tile_id = info['id']
+            mask_path = state_dir_h / f"{tile_id}_mask.npy"
 
-                region = load_region(input_path, btile.x, btile.y, btile.width, btile.height)
-                combined_mask = load_combined_mask(mask_path, btile.height, btile.width)
+            # Load region ONCE per tile
+            region = load_region(input_path, btile.x, btile.y, btile.width, btile.height)
+            combined_mask = np.zeros((btile.height, btile.width), dtype=np.uint8)
 
-                new_masks, combined_mask, coverage = run_single_pass(
-                    predictor=self.predictor,
-                    image=region,
-                    combined_mask=combined_mask,
-                    initial_points=h_points,
-                    config=h_cfg.cascade,
-                    pass_idx=pass_idx,
-                    mask_filter=info['filter']
+            tile_pixels = btile.width * btile.height
+            max_mask_pixels = int(tile_pixels * 0.4)
+
+            for pass_idx in range(n_passes_h):
+                # Get thresholds for this pass (relax progressively)
+                iou_thresh, stability_thresh = h_cfg.cascade.thresholds.interpolate(
+                    pass_idx, n_passes_h
                 )
 
-                save_combined_mask(combined_mask, mask_path)
+                # Select points based on pass number
+                if pass_idx == 0:
+                    # Pass 0: Use fixed grid filtered by mask
+                    valid_points = filter_by_mask(h_points, combined_mask)
+                else:
+                    # Pass 1+: Use K-means restricted to zone
+                    valid_points = make_zone_kmeans_points(
+                        combined_mask,
+                        zone_type="h",
+                        zone_width=zone_width,
+                        n_points=h_cfg.cascade.points_per_pass,
+                        erosion=h_cfg.cascade.point_erosion
+                    )
+
+                if len(valid_points) == 0:
+                    break  # All points covered, done with this tile
+
+                # Apply black mask to already-segmented areas
+                current_image = apply_black_mask(region, combined_mask)
+
+                # Generate masks from selected points
+                new_masks = self.predictor.predict_points_batched(
+                    current_image,
+                    valid_points,
+                    iou_thresh=iou_thresh,
+                    stability_thresh=stability_thresh
+                )
+
+                # Filter only masks that cross the discontinuity
+                new_masks = [m for m in new_masks if info['filter'](m)]
+
+                # Filter out masks that are too large (>40% of tile)
+                new_masks = [m for m in new_masks if m.mask.sum() <= max_mask_pixels]
+
+                # Update combined mask (only with valid masks)
+                for mask in new_masks:
+                    combined_mask = np.maximum(combined_mask, mask.mask)
 
                 # Convert masks to labels IMMEDIATELY
-                # Only fill empty pixels (don't overwrite existing labels)
-                # Skip masks that are too large (>40% of tile)
-                tile_pixels = btile.width * btile.height
-                max_mask_pixels = int(tile_pixels * 0.4)
-
                 for mask in new_masks:
-                    mask_size = mask.mask.sum()
-                    if mask_size > max_mask_pixels:
-                        continue  # Skip oversized masks
-
                     y_end = min(btile.y + mask.mask.shape[0], height)
                     x_end = min(btile.x + mask.mask.shape[1], width)
                     local_mask = mask.mask[:y_end - btile.y, :x_end - btile.x]
-                    region = band1[btile.y:y_end, btile.x:x_end]
-                    region[(local_mask > 0) & (region == 0)] = current_label
+                    band1_region = band1[btile.y:y_end, btile.x:x_end]
+                    band1_region[(local_mask > 0) & (band1_region == 0)] = current_label
                     current_label += 1
-                    pass_new += 1
 
-            logger.debug(f"H Pass {pass_idx}: {pass_new} new masks")
+            # Save combined mask ONCE per tile (for potential resume)
+            save_combined_mask(combined_mask, mask_path)
 
         if self.config.output.save_intermediate:
             save_labels(
@@ -557,52 +615,77 @@ class Pipeline:
                 'filter': lambda m, bx=btile.x, by=btile.y, dx=btile.disc_x, dy=btile.disc_y: crosses_corner(m.mask, dx, dy, bx, by),
             })
 
-        # Process corners pass by pass
+        # Process corners - tile by tile, all passes per tile (reduces I/O)
         n_passes = c_cfg.cascade.n_passes
-        logger.info(f"Processing {len(corner_tiles)} corner tiles")
+        logger.info(f"Processing {len(corner_tiles)} corner tiles (fixed grid, {n_passes} passes each)")
 
-        for pass_idx in tqdm(range(n_passes), desc="Corner Passes", unit="pass"):
-            pass_new = 0
-            for info in tqdm(corner_info, desc=f"  Corner Pass {pass_idx}", leave=False, unit="tile"):
-                btile = info['btile']
-                tile_id = info['id']
-                mask_path = state_dir / f"{tile_id}_mask.npy"
+        for info in tqdm(corner_info, desc="Corner Tiles", unit="tile"):
+            btile = info['btile']
+            tile_id = info['id']
+            mask_path = state_dir / f"{tile_id}_mask.npy"
 
-                region = load_region(input_path, btile.x, btile.y, btile.width, btile.height)
-                combined_mask = load_combined_mask(mask_path, btile.height, btile.width)
+            # Load region ONCE per tile
+            region = load_region(input_path, btile.x, btile.y, btile.width, btile.height)
+            combined_mask = np.zeros((btile.height, btile.width), dtype=np.uint8)
 
-                new_masks, combined_mask, coverage = run_single_pass(
-                    predictor=self.predictor,
-                    image=region,
-                    combined_mask=combined_mask,
-                    initial_points=corner_points,  # Fixed grid, same for all corners
-                    config=c_cfg.cascade,
-                    pass_idx=pass_idx,
-                    mask_filter=info['filter']
+            tile_pixels = btile.width * btile.height
+            max_mask_pixels = int(tile_pixels * 0.4)
+
+            for pass_idx in range(n_passes):
+                # Get thresholds for this pass (relax progressively)
+                iou_thresh, stability_thresh = c_cfg.cascade.thresholds.interpolate(
+                    pass_idx, n_passes
                 )
 
-                save_combined_mask(combined_mask, mask_path)
+                # Select points based on pass number
+                if pass_idx == 0:
+                    # Pass 0: Use fixed grid filtered by mask
+                    valid_points = filter_by_mask(corner_points, combined_mask)
+                else:
+                    # Pass 1+: Use K-means restricted to zone
+                    valid_points = make_zone_kmeans_points(
+                        combined_mask,
+                        zone_type="corner",
+                        zone_width=zone_width,
+                        n_points=c_cfg.cascade.points_per_pass,
+                        erosion=c_cfg.cascade.point_erosion
+                    )
+
+                if len(valid_points) == 0:
+                    break  # All points covered, done with this tile
+
+                # Apply black mask to already-segmented areas
+                current_image = apply_black_mask(region, combined_mask)
+
+                # Generate masks from selected points
+                new_masks = self.predictor.predict_points_batched(
+                    current_image,
+                    valid_points,
+                    iou_thresh=iou_thresh,
+                    stability_thresh=stability_thresh
+                )
+
+                # Filter only masks that cross the corner
+                new_masks = [m for m in new_masks if info['filter'](m)]
+
+                # Filter out masks that are too large (>40% of tile)
+                new_masks = [m for m in new_masks if m.mask.sum() <= max_mask_pixels]
+
+                # Update combined mask (only with valid masks)
+                for mask in new_masks:
+                    combined_mask = np.maximum(combined_mask, mask.mask)
 
                 # Convert masks to labels IMMEDIATELY
-                # Only fill empty pixels (don't overwrite existing labels)
-                # Skip masks that are too large (>40% of tile)
-                tile_pixels = btile.width * btile.height
-                max_mask_pixels = int(tile_pixels * 0.4)
-
                 for mask in new_masks:
-                    mask_size = mask.mask.sum()
-                    if mask_size > max_mask_pixels:
-                        continue  # Skip oversized masks
-
                     y_end = min(btile.y + mask.mask.shape[0], height)
                     x_end = min(btile.x + mask.mask.shape[1], width)
                     local_mask = mask.mask[:y_end - btile.y, :x_end - btile.x]
-                    region = band2[btile.y:y_end, btile.x:x_end]
-                    region[(local_mask > 0) & (region == 0)] = current_label
+                    band2_region = band2[btile.y:y_end, btile.x:x_end]
+                    band2_region[(local_mask > 0) & (band2_region == 0)] = current_label
                     current_label += 1
-                    pass_new += 1
 
-            logger.debug(f"Corner Pass {pass_idx}: {pass_new} new masks")
+            # Save combined mask ONCE per tile (for potential resume)
+            save_combined_mask(combined_mask, mask_path)
 
         if self.config.output.save_intermediate:
             save_labels(

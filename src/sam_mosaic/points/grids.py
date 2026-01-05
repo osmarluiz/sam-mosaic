@@ -270,3 +270,118 @@ def make_kmeans_points(
         idx = np.random.choice(len(valid_coords), n_points, replace=False)
         # Convert (y, x) to (x, y)
         return valid_coords[idx, ::-1].astype(np.int32)
+
+
+def make_v_zone_mask(
+    height: int,
+    width: int,
+    zone_width: int = 50
+) -> np.ndarray:
+    """Create zone mask for vertical discontinuity (band around x=width/2).
+
+    Args:
+        height: Tile height.
+        width: Tile width.
+        zone_width: Total width of zone (default 50 = 25px each side).
+
+    Returns:
+        Boolean mask (H, W) where True = inside zone.
+    """
+    mask = np.zeros((height, width), dtype=bool)
+    center_x = width // 2
+    half_zone = zone_width // 2
+    x_start = max(0, center_x - half_zone)
+    x_end = min(width, center_x + half_zone)
+    mask[:, x_start:x_end] = True
+    return mask
+
+
+def make_h_zone_mask(
+    height: int,
+    width: int,
+    zone_width: int = 50
+) -> np.ndarray:
+    """Create zone mask for horizontal discontinuity (band around y=height/2).
+
+    Args:
+        height: Tile height.
+        width: Tile width.
+        zone_width: Total height of zone (default 50 = 25px each side).
+
+    Returns:
+        Boolean mask (H, W) where True = inside zone.
+    """
+    mask = np.zeros((height, width), dtype=bool)
+    center_y = height // 2
+    half_zone = zone_width // 2
+    y_start = max(0, center_y - half_zone)
+    y_end = min(height, center_y + half_zone)
+    mask[y_start:y_end, :] = True
+    return mask
+
+
+def make_corner_zone_mask(
+    height: int,
+    width: int,
+    zone_width: int = 50
+) -> np.ndarray:
+    """Create zone mask for corner (square around center).
+
+    Args:
+        height: Tile height.
+        width: Tile width.
+        zone_width: Size of zone (default 50 = 25px each direction).
+
+    Returns:
+        Boolean mask (H, W) where True = inside zone.
+    """
+    mask = np.zeros((height, width), dtype=bool)
+    center_x = width // 2
+    center_y = height // 2
+    half_zone = zone_width // 2
+    x_start = max(0, center_x - half_zone)
+    x_end = min(width, center_x + half_zone)
+    y_start = max(0, center_y - half_zone)
+    y_end = min(height, center_y + half_zone)
+    mask[y_start:y_end, x_start:x_end] = True
+    return mask
+
+
+def make_zone_kmeans_points(
+    combined_mask: np.ndarray,
+    zone_type: str,
+    zone_width: int = 50,
+    n_points: int = 64,
+    erosion: int = 5
+) -> np.ndarray:
+    """Generate K-means points restricted to zone around discontinuity.
+
+    Points are placed only in:
+    1. The zone around the discontinuity (V, H, or corner)
+    2. Areas not yet segmented (combined_mask == 0)
+
+    Args:
+        combined_mask: Binary mask (H, W) where non-zero = already segmented.
+        zone_type: Type of zone ("v", "h", or "corner").
+        zone_width: Width of zone in pixels.
+        n_points: Number of points to generate.
+        erosion: Erosion iterations to avoid placing points near edges.
+
+    Returns:
+        Array of shape (N, 2) with (x, y) coordinates.
+    """
+    height, width = combined_mask.shape
+
+    # Create zone mask based on type
+    if zone_type == "v":
+        zone_mask = make_v_zone_mask(height, width, zone_width)
+    elif zone_type == "h":
+        zone_mask = make_h_zone_mask(height, width, zone_width)
+    else:  # corner
+        zone_mask = make_corner_zone_mask(height, width, zone_width)
+
+    # Valid area = inside zone AND not yet segmented
+    valid_mask = zone_mask & (combined_mask == 0)
+
+    # Use existing K-means function with erosion
+    return make_kmeans_points(valid_mask, n_points, erosion)

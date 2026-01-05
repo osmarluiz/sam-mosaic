@@ -93,6 +93,90 @@ def load_combined_mask(path: Path, height: int, width: int) -> np.ndarray:
     return np.zeros((height, width), dtype=np.uint8)
 
 
+def run_border_cascade(
+    predictor: SAMPredictor,
+    image: np.ndarray,
+    points: np.ndarray,
+    config: CascadeConfig,
+    mask_filter: Callable[[Mask], bool],
+    save_passes: Optional[Path] = None,
+    tile_id: str = ""
+) -> List[Mask]:
+    """Run cascade for border correction tiles (V, H, corners).
+
+    Unlike run_cascade, this uses a FIXED grid of points for all passes.
+    Points are NOT removed when they fall inside already-segmented areas.
+    The image is blacked out in segmented regions, and the crossing filter
+    ensures only masks that cross the discontinuity are accepted.
+
+    Args:
+        predictor: SAM predictor instance.
+        image: RGB image array (H, W, 3).
+        points: Fixed point grid used for ALL passes (N, 2).
+        config: Cascade configuration.
+        mask_filter: Function to filter masks (crosses_v, crosses_h, crosses_corner).
+        save_passes: Optional path to save intermediate pass results.
+        tile_id: Tile identifier for saving.
+
+    Returns:
+        List of all accepted masks across all passes.
+    """
+    all_masks: List[Mask] = []
+    combined_mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+
+    pbar = tqdm(range(config.n_passes), desc=f"  Passes", leave=False, unit="pass")
+
+    for pass_idx in pbar:
+        # Get thresholds for this pass (relax progressively)
+        iou_thresh, stability_thresh = config.thresholds.interpolate(
+            pass_idx, config.n_passes
+        )
+
+        # Apply black mask to image for this pass
+        current_image = apply_black_mask(image, combined_mask)
+
+        # Always use the SAME fixed grid of points
+        masks = predictor.predict_points_batched(
+            current_image,
+            points,
+            iou_thresh=iou_thresh,
+            stability_thresh=stability_thresh
+        )
+
+        # Filter only masks that cross the discontinuity
+        masks = [m for m in masks if mask_filter(m)]
+
+        # Update combined mask
+        for mask in masks:
+            combined_mask = np.maximum(combined_mask, mask.mask)
+
+        all_masks.extend(masks)
+
+        coverage = combined_mask.sum() / combined_mask.size * 100
+
+        pbar.set_postfix({
+            "masks": len(all_masks),
+            "cov": f"{coverage:.1f}%",
+            "iou": f"{iou_thresh:.2f}"
+        })
+
+        # Save intermediate pass result
+        if save_passes is not None:
+            save_passes.mkdir(parents=True, exist_ok=True)
+            from sam_mosaic.io.writer import save_mask
+            save_mask(
+                combined_mask,
+                save_passes / f"{tile_id}_pass{pass_idx:02d}.tif"
+            )
+
+        # Early stop if no new masks found
+        if len(masks) == 0 and pass_idx > 0:
+            pbar.set_postfix({"status": "complete"})
+            break
+
+    return all_masks
+
+
 def run_cascade(
     predictor: SAMPredictor,
     image: np.ndarray,
@@ -202,9 +286,20 @@ def run_cascade_on_tile(
     Returns:
         List of masks (in tile coordinates).
     """
-    # Create mask filter based on discontinuity type
-    mask_filter = None
+    # Base tiles: use K-means cascade (original behavior)
+    if disc_type == "base":
+        return run_cascade(
+            predictor=predictor,
+            image=tile_image,
+            points=points,
+            config=config,
+            mask_filter=None,
+            save_passes=save_passes,
+            tile_id=tile_id
+        )
 
+    # Border tiles (v, h, corner): use fixed grid cascade
+    # Create mask filter based on discontinuity type
     if disc_type == "v":
         from sam_mosaic.tiling.borders import crosses_v
         mask_filter = lambda m: crosses_v(m.mask, disc_x, tile_x)
@@ -213,11 +308,11 @@ def run_cascade_on_tile(
         from sam_mosaic.tiling.borders import crosses_h
         mask_filter = lambda m: crosses_h(m.mask, disc_y, tile_y)
 
-    elif disc_type == "corner":
+    else:  # corner
         from sam_mosaic.tiling.borders import crosses_corner
         mask_filter = lambda m: crosses_corner(m.mask, disc_x, disc_y, tile_x, tile_y)
 
-    return run_cascade(
+    return run_border_cascade(
         predictor=predictor,
         image=tile_image,
         points=points,

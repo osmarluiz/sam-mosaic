@@ -52,6 +52,15 @@ class CornerGridConfig:
 
 
 @dataclass
+class PostprocessConfig:
+    """Post-processing configuration for base tiles."""
+    enabled: bool = True
+    min_area: int = 100              # Remove masks smaller than this
+    max_enclosed_area: int = 500     # Merge enclosed masks smaller than this
+    edge_max_distance: int = 15      # Search distance for edge completion
+
+
+@dataclass
 class BaseTilesConfig:
     """Base tile segmentation configuration."""
     grid: UniformGridConfig = field(default_factory=UniformGridConfig)
@@ -62,6 +71,7 @@ class BaseTilesConfig:
             stability=(0.95, 0.59)
         )
     ))
+    postprocess: PostprocessConfig = field(default_factory=PostprocessConfig)
 
 
 @dataclass
@@ -206,11 +216,18 @@ def load_config(path: str | Path) -> Config:
     if "base_tiles" in data:
         bt_data = data["base_tiles"]
         grid_data = bt_data.get("grid", {})
+        pp_data = bt_data.get("postprocess", {})
         config.base_tiles = BaseTilesConfig(
             grid=UniformGridConfig(
                 points_per_side=grid_data.get("points_per_side", 64)
             ),
-            cascade=_parse_cascade(bt_data.get("cascade", {}))
+            cascade=_parse_cascade(bt_data.get("cascade", {})),
+            postprocess=PostprocessConfig(
+                enabled=pp_data.get("enabled", True),
+                min_area=pp_data.get("min_area", 100),
+                max_enclosed_area=pp_data.get("max_enclosed_area", 500),
+                edge_max_distance=pp_data.get("edge_max_distance", 15)
+            )
         )
 
     # Border correction config

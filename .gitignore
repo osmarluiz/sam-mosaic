@@ -98,8 +98,9 @@ output/
 outputs/
 results/
 
-# Experiments (local only)
-experiments/
+# Experiments outputs (local only)
+experiments/*/output/
+experiments/*/state/
 
 # Shapefiles
 *.shp

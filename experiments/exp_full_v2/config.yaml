@@ -1,0 +1,75 @@
+# Experiment: Full Plant23 image (15000 x 30000) - V2
+# Changes from exp_full:
+#   - V/H/Corners: Fixed grid (pass 0), K-means in zone (pass 1+)
+#   - Filter large masks (>40%) BEFORE updating combined_mask
+#   - Base: IoU & Stability 0.92 -> 0.78 (15 passes)
+#   - V/H/Corners: IoU & Stability 0.92 -> 0.88 (5 passes)
+#   - Zone width: 50px (was 100px)
+
+sam:
+  checkpoint: "D:/SAM2/checkpoints/sam2.1_hiera_large.pt"
+  model_type: "large"
+  device: "cuda"
+
+tiling:
+  tile_size: 2000
+  overlap: 0
+
+base_tiles:
+  grid:
+    points_per_side: 64          # 64x64 = 4096 points (pass 0 only)
+  cascade:
+    n_passes: 15                 # 0.92 - 0.01*14 = 0.78
+    thresholds:
+      iou: [0.92, 0.78]          # -0.01 per pass
+      stability: [0.92, 0.78]    # -0.01 per pass
+    points_per_pass: 64          # K-means points for pass 1+
+    point_erosion: 5             # Erosion pixels to avoid edges
+  postprocess:
+    enabled: true
+    min_area: 100                # Remove masks smaller than 100 pixels
+    max_enclosed_area: 500       # Merge enclosed masks smaller than 500 pixels
+    edge_max_distance: 15        # Search up to 15 pixels for edge completion
+
+border_correction:
+  zone_width: 50
+  v_tiles:
+    grid:
+      n_across: 3                # 3 columns: -25px, 0, +25px from discontinuity
+      n_along: 80                # 3x80 = 240 points (fixed grid, pass 0 only)
+    cascade:
+      n_passes: 5                # 0.92 - 0.01*4 = 0.88
+      thresholds:
+        iou: [0.92, 0.88]        # -0.01 per pass
+        stability: [0.92, 0.88]  # -0.01 per pass
+      points_per_pass: 64        # K-means points for pass 1+ (in zone)
+      point_erosion: 5           # Erosion pixels to avoid edges
+  h_tiles:
+    grid:
+      n_across: 3                # 3 rows: -25px, 0, +25px from discontinuity
+      n_along: 80                # 3x80 = 240 points (fixed grid, pass 0 only)
+    cascade:
+      n_passes: 5                # 0.92 - 0.01*4 = 0.88
+      thresholds:
+        iou: [0.92, 0.88]        # -0.01 per pass
+        stability: [0.92, 0.88]  # -0.01 per pass
+      points_per_pass: 64        # K-means points for pass 1+ (in zone)
+      point_erosion: 5           # Erosion pixels to avoid edges
+  corner_tiles:
+    grid:
+      n_x: 3                     # 3x3 = 9 points (fixed grid, pass 0 only)
+      n_y: 3
+    cascade:
+      n_passes: 5                # 0.92 - 0.01*4 = 0.88
+      thresholds:
+        iou: [0.92, 0.88]        # -0.01 per pass
+        stability: [0.92, 0.88]  # -0.01 per pass
+      points_per_pass: 9         # K-means points for pass 1+ (in zone)
+      point_erosion: 5           # Erosion pixels to avoid edges
+
+merge:
+  priority: [2, 1, 0]            # corners > V/H > base
+
+output:
+  save_intermediate: true
+  formats: ["tif", "shp"]
