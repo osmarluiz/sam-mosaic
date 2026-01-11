@@ -167,11 +167,24 @@ Examples:
         print(f"Error: Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Determine checkpoint
+    # Determine checkpoint and config
     checkpoint = args.checkpoint
-    if checkpoint is None and args.config is None:
-        print("Error: Either --checkpoint or --config must be specified", file=sys.stderr)
-        sys.exit(1)
+    config_path = args.config
+
+    # If no config or checkpoint specified, try to use default config
+    if checkpoint is None and config_path is None:
+        # Look for default config in package directory
+        import sam_mosaic
+        package_dir = Path(sam_mosaic.__file__).parent.parent.parent
+        default_config = package_dir / "config" / "default.yaml"
+
+        if default_config.exists():
+            config_path = str(default_config)
+            print(f"Using default config: {default_config}")
+        else:
+            print("Error: Either --checkpoint or --config must be specified", file=sys.stderr)
+            print("       Or place config/default.yaml in the package directory", file=sys.stderr)
+            sys.exit(1)
 
     # Build parameters dict for overrides
     params = {}
@@ -209,10 +222,10 @@ Examples:
 
     # Run segmentation
     try:
-        if args.config:
+        if config_path:
             # Load config and apply overrides
             from sam_mosaic.config import load_config, Config
-            config = load_config(args.config)
+            config = load_config(config_path)
 
             if checkpoint:
                 config.sam_checkpoint = checkpoint

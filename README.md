@@ -22,7 +22,7 @@ Segment large remote sensing images (satellite, aerial, drone) that don't fit in
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/sam-mosaic.git
+git clone https://github.com/osmarluiz/sam-mosaic.git
 cd sam-mosaic
 
 # Install the package
@@ -47,11 +47,14 @@ cd ..
 ### 3. Run Segmentation
 
 ```bash
-# Basic usage - just provide input image and output directory
-sam-mosaic path/to/your/image.tif path/to/output/
+# Run from inside the sam-mosaic directory (uses default config)
+sam-mosaic /path/to/your/image.tif /path/to/output/
 
-# Example
-sam-mosaic data/ortofoto.tif results/segmentation/
+# Example (run from sam-mosaic folder)
+sam-mosaic /data/ortofoto.tif /results/segmentation/
+
+# Or specify checkpoint explicitly (can run from anywhere)
+sam-mosaic /path/to/image.tif /path/to/output/ --checkpoint /path/to/checkpoints/sam2.1_hiera_large.pt
 ```
 
 That's it! The tool will generate:
@@ -325,7 +328,7 @@ If you use this software in your research, please cite:
   title = {SAM-Mosaic: Large-scale Image Segmentation with SAM2},
   author = {Carvalho, Osmar Luiz Ferreira de},
   year = {2025},
-  url = {https://github.com/yourusername/sam-mosaic}
+  url = {https://github.com/osmarluiz/sam-mosaic}
 }
 ```
 
