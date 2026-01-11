@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sam-mosaic"
+version = "2.0.0"
+description = "Large-scale image segmentation using SAM2 with tiled processing and intelligent merging"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Osmar Luiz Ferreira de Carvalho", email = "osmarluiz.oc@gmail.com"}
+]
+keywords = ["segmentation", "SAM", "remote-sensing", "deep-learning", "image-processing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "rasterio>=1.3.0",
+    "torch>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "scipy>=1.11.0",
+    "shapely>=2.0.0",
+    "fiona>=1.9.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+sam-mosaic = "sam_mosaic.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/osmarluizferreira/sam-mosaic"
+Documentation = "https://github.com/osmarluizferreira/sam-mosaic#readme"
+Repository = "https://github.com/osmarluizferreira/sam-mosaic"
+Issues = "https://github.com/osmarluizferreira/sam-mosaic/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

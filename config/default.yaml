@@ -1,0 +1,36 @@
+# SAM-Mosaic2 Default Configuration
+# All parameters can be overridden via CLI or API
+
+tile:
+  size: 1000           # Tile size in pixels (useful area)
+  padding: 50          # Padding for context (total read = size + 2*padding)
+
+threshold:
+  iou_start: 0.93      # Initial IoU threshold (restrictive)
+  iou_end: 0.60        # Final IoU threshold (permissive)
+  stability_start: 0.93
+  stability_end: 0.60
+  step: 0.01           # Threshold decrease per pass
+
+segmentation:
+  points_per_side: 64  # Grid density (64x64 = 4096 points)
+  target_coverage: 99.0  # Stop when coverage reaches this %
+  max_passes: null     # null = no limit, or integer
+  use_black_mask: true # Mask segmented areas with black
+  use_adaptive_threshold: true  # Decrease threshold each pass
+
+merge:
+  min_contact_pixels: 5  # Minimum contact to merge at discontinuities
+  min_mask_area: 100     # Remove masks smaller than this
+  merge_enclosed_max_area: 500  # Merge enclosed masks up to this size
+
+output:
+  save_labels: true    # Save label raster (TIFF)
+  save_shapefile: true # Save vectorized shapefile
+  save_geopackage: false
+  save_stats: true     # Save detailed stats JSON
+  simplify_tolerance: 1.0  # Polygon simplification in map units
+
+# SAM2 checkpoint path (required)
+# Default assumes checkpoint is in project's checkpoints/ folder
+sam_checkpoint: checkpoints/sam2.1_hiera_large.pt
