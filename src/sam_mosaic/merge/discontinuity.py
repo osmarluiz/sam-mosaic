@@ -130,9 +130,17 @@ def merge_at_discontinuities(
             return labels.copy(), stats
         return labels.copy()
 
-    # Combine all pairs and deduplicate
-    all_pairs = np.concatenate(all_pairs)
-    unique_pairs = np.unique(all_pairs, axis=0)
+    # Combine all pairs and deduplicate using set (O(n) vs O(n log n) for np.unique)
+    seen = set()
+    unique_pairs = []
+    for pairs_array in all_pairs:
+        for a, b in pairs_array:
+            # Normalize pair order for consistent deduplication
+            pair = (min(a, b), max(a, b))
+            if pair not in seen:
+                seen.add(pair)
+                unique_pairs.append(pair)
+    unique_pairs = np.array(unique_pairs, dtype=np.uint32) if unique_pairs else np.array([], dtype=np.uint32).reshape(0, 2)
     stats["unique_pairs_to_merge"] = len(unique_pairs)
 
     if len(unique_pairs) == 0:
@@ -167,9 +175,12 @@ def merge_at_discontinuities(
             else:
                 lut[root_a] = root_b
 
-    # Flatten LUT (ensure all point to final root)
-    for i in range(len(lut)):
-        lut[i] = find_root(i)
+    # Flatten LUT only for labels that exist in the image (skip unused label IDs)
+    # This is O(unique_labels) instead of O(max_label)
+    used_labels = np.unique(labels)
+    used_labels = used_labels[used_labels > 0]  # Exclude background
+    for label in used_labels:
+        lut[label] = find_root(label)
 
     # Count how many labels were merged (labels that point to a different root)
     labels_merged = int((lut != np.arange(len(lut))).sum())

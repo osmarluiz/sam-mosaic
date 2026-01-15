@@ -72,6 +72,9 @@ def run_multipass_segmentation(
     pass_idx = 0
     prev_coverage = 0.0
 
+    # Reusable buffer for black mask application (avoids repeated memory allocation)
+    working_image = None
+
     while True:
         # Check max passes
         if seg_config.max_passes is not None and pass_idx >= seg_config.max_passes:
@@ -89,9 +92,14 @@ def run_multipass_segmentation(
             break
 
         # Apply black mask to image if enabled
-        # On pass 0, combined_mask is zeros so this has no effect anyway
-        if seg_config.use_black_mask:
-            current_image = apply_black_mask(image, combined_mask)
+        # Skip on pass 0: combined_mask is all zeros, so no effect (avoids unnecessary copy)
+        if seg_config.use_black_mask and pass_idx > 0:
+            # Reuse buffer to avoid repeated memory allocation
+            if working_image is None:
+                working_image = image.copy()
+            else:
+                np.copyto(working_image, image)
+            current_image = apply_black_mask(working_image, combined_mask, copy=False)
         else:
             current_image = image
 

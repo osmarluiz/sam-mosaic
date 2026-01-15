@@ -146,6 +146,12 @@ Examples:
         type=float,
         help="Polygon simplification tolerance in map units (default: 1.0). Use 0 for no simplification."
     )
+    output_group.add_argument(
+        "--streaming-mode",
+        type=str,
+        choices=["auto", "ram", "disk"],
+        help="Mosaic storage mode: 'auto' (default), 'ram' (faster), or 'disk' (less memory)"
+    )
 
     # Other options
     parser.add_argument(
@@ -219,6 +225,8 @@ Examples:
         params["save_geopackage"] = True
     if args.simplify_tolerance is not None:
         params["simplify_tolerance"] = args.simplify_tolerance
+    if args.streaming_mode is not None:
+        params["streaming_mode"] = args.streaming_mode
 
     # Run segmentation
     try:

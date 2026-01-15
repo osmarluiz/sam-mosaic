@@ -30,6 +30,7 @@ output:
   save_geopackage: false
   save_stats: true     # Save detailed stats JSON
   simplify_tolerance: 1.0  # Polygon simplification in map units
+  streaming_mode: auto # Mosaic storage: "auto", "ram", or "disk"
 
 # SAM2 checkpoint path (required)
 # Default assumes checkpoint is in project's checkpoints/ folder

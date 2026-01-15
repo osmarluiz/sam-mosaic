@@ -1,26 +1,11 @@
 """SAM2 predictor wrapper for segmentation."""
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List
 import numpy as np
 import torch
 
 from sam_mosaic.sam.masks import Mask
-
-
-@dataclass
-class PredictionResult:
-    """Result from SAM2 prediction.
-
-    Attributes:
-        masks: List of predicted masks.
-        scores: Confidence scores for each mask.
-        low_res_masks: Low-resolution mask logits.
-    """
-    masks: List[np.ndarray]
-    scores: np.ndarray
-    low_res_masks: Optional[np.ndarray] = None
 
 
 class SAMPredictor:
@@ -116,40 +101,6 @@ class SAMPredictor:
         self._predictor.set_image(image)
         self._current_image = image
 
-    def predict_points(
-        self,
-        points: np.ndarray,
-        labels: Optional[np.ndarray] = None,
-        multimask_output: bool = True
-    ) -> PredictionResult:
-        """Predict masks for given point prompts.
-
-        Args:
-            points: Point coordinates of shape (N, 2) as (x, y).
-            labels: Point labels (1=foreground, 0=background). Default all 1s.
-            multimask_output: Whether to return multiple masks per point.
-
-        Returns:
-            PredictionResult with masks and scores.
-        """
-        if self._predictor is None:
-            raise RuntimeError("Call set_image() before predict_points()")
-
-        if labels is None:
-            labels = np.ones(len(points), dtype=np.int32)
-
-        masks, scores, low_res = self._predictor.predict(
-            point_coords=points,
-            point_labels=labels,
-            multimask_output=multimask_output
-        )
-
-        return PredictionResult(
-            masks=[m for m in masks],
-            scores=scores,
-            low_res_masks=low_res
-        )
-
     def predict_points_batched(
         self,
         image: np.ndarray,
@@ -201,6 +152,9 @@ class SAMPredictor:
         # Generate masks in one batched call
         mask_outputs = generator.generate(image)
 
+        # Free generator memory immediately (prevents memory leak across tiles/passes)
+        del generator
+
         # Convert to our Mask format
         masks = []
         for mask_data in mask_outputs:
@@ -213,29 +167,6 @@ class SAMPredictor:
             ))
 
         return masks
-
-    def _calculate_stability(self, mask: np.ndarray) -> float:
-        """Calculate mask stability score.
-
-        Stability is approximated by the ratio of mask pixels
-        that are "confident" (not near the boundary).
-
-        Args:
-            mask: Binary mask array.
-
-        Returns:
-            Stability score in [0, 1].
-        """
-        from scipy import ndimage
-
-        if mask.sum() == 0:
-            return 0.0
-
-        # Erode mask to find confident interior
-        eroded = ndimage.binary_erosion(mask, iterations=2)
-        interior_ratio = eroded.sum() / mask.sum() if mask.sum() > 0 else 0
-
-        return float(interior_ratio)
 
     def reset_image(self) -> None:
         """Clear the current image from memory."""

@@ -32,6 +32,23 @@ Example usage:
     )
 """
 
+# =============================================================================
+# Environment setup (must be before other imports)
+# =============================================================================
+import os
+import sys
+import warnings
+
+# Silence SAM2 optional CUDA extension warning (doesn't affect results)
+warnings.filterwarnings("ignore", message="cannot import name '_C' from 'sam2'")
+
+# Fix MiniBatchKMeans memory leak on Windows with MKL
+# See: https://github.com/scikit-learn/scikit-learn/issues/23246
+if sys.platform == "win32" and "OMP_NUM_THREADS" not in os.environ:
+    os.environ["OMP_NUM_THREADS"] = "1"
+
+# =============================================================================
+
 __version__ = "2.0.0"
 __author__ = "Osmar Luiz Ferreira de Carvalho"
 

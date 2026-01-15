@@ -11,8 +11,9 @@ import torch
 from sam_mosaic.config import Config
 from sam_mosaic.sam import SAMPredictor
 from sam_mosaic.io import get_image_metadata, load_tile, save_labels, ImageMetadata
-from sam_mosaic.merge import merge_at_discontinuities, merge_enclosed_regions, remove_small_regions
-from sam_mosaic.core.tile import process_tile, place_tile_in_mosaic, calculate_grid_dimensions
+from sam_mosaic.merge import merge_at_discontinuities, merge_enclosed_and_remove_small
+from sam_mosaic.core.tile import process_tile, calculate_grid_dimensions
+from sam_mosaic.core.mosaic import create_mosaic_writer
 
 
 @dataclass
@@ -121,10 +122,24 @@ class Pipeline:
         if verbose:
             print("OK")
 
-        # Initialize mosaic
+        # Initialize mosaic writer
         mosaic_height = n_rows * tile_size
         mosaic_width = n_cols * tile_size
-        mosaic = np.zeros((mosaic_height, mosaic_width), dtype=np.uint32)
+        streaming_mode = self.config.output.streaming_mode
+
+        mosaic_writer = create_mosaic_writer(
+            height=mosaic_height,
+            width=mosaic_width,
+            tile_size=tile_size,
+            streaming_mode=streaming_mode,
+            crs=self._metadata.crs,
+            transform=self._metadata.transform
+        )
+
+        # Determine actual mode used (for verbose output)
+        actual_mode = "disk" if type(mosaic_writer).__name__ == "DiskMosaic" else "ram"
+        if verbose and streaming_mode == "auto":
+            print(f"  Mosaic mode: {actual_mode} (auto-selected)")
 
         # Process tiles
         if verbose:
@@ -157,10 +172,9 @@ class Pipeline:
                     start_label=label_offset + 1
                 )
 
-                # Place in mosaic
-                label_offset = place_tile_in_mosaic(
-                    mosaic, result, tile_size, label_offset
-                )
+                # Write tile to mosaic
+                mosaic_writer.write_tile(result.labels, row, col)
+                label_offset = int(result.labels.max()) if result.labels.max() > 0 else label_offset
 
                 tile_stats.append({
                     "row": row,
@@ -187,29 +201,42 @@ class Pipeline:
                           f"{result.coverage:5.1f}% | {result.n_labels:4d} seg | "
                           f"{result.n_passes} passes | ETA: {eta_str}")
 
-                # Cleanup
-                gc.collect()
-                torch.cuda.empty_cache()
+                # Cleanup: reset predictor state for next tile
+                self._predictor.reset_image()
+
+                # Batch GPU memory cleanup (every 10 tiles) to reduce sync overhead
+                if tile_idx % 10 == 0:
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+        # Final GPU cleanup after all tiles
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # Post-processing
         if verbose:
             print("-" * 60)
             print("Post-processing...", flush=True)
 
-        # First: Merge enclosed regions (save small enclosed polygons by merging them)
-        t0 = time.time()
-        mosaic = merge_enclosed_regions(mosaic, self.config.merge.merge_enclosed_max_area)
-        if verbose:
-            print(f"  Merge enclosed: done ({time.time()-t0:.1f}s)", flush=True)
+        # Load mosaic into memory for post-processing
+        mosaic = mosaic_writer.read()
 
-        # Second: Remove small isolated regions (only affects those NOT enclosed)
+        # Merge enclosed regions + remove small (combined for efficiency - single ndimage.label)
         t0 = time.time()
-        mosaic = remove_small_regions(mosaic, self.config.merge.min_mask_area)
+        mosaic = merge_enclosed_and_remove_small(
+            mosaic,
+            merge_enclosed_max_area=self.config.merge.merge_enclosed_max_area,
+            remove_small_min_area=self.config.merge.min_mask_area
+        )
         if verbose:
-            print(f"  Remove small (<{self.config.merge.min_mask_area}px): done ({time.time()-t0:.1f}s)", flush=True)
+            print(f"  Merge enclosed + remove small: done ({time.time()-t0:.1f}s)", flush=True)
 
-        # Save intermediate result (before merge at edges)
-        mosaic_before_merge = mosaic.copy()
+        # Calculate segment counts BEFORE merge
+        segment_counts_before = np.bincount(mosaic.ravel())
+
+        # Only copy mosaic if we need to save labels_before_merge.tif
+        # (This avoids 400MB+ copy when not saving intermediate labels)
+        mosaic_before_merge = mosaic.copy() if self.config.output.save_labels else None
 
         # Merge at discontinuities
         t0 = time.time()
@@ -223,21 +250,24 @@ class Pipeline:
             print(f"  Merge at edges: done ({time.time()-t0:.1f}s) "
                   f"[{merge_stats['labels_merged']} labels merged]", flush=True)
 
-        # Calculate final stats (single count at the end)
-        n_segments = int((np.bincount(mosaic.ravel()) > 0).sum()) - 1  # Fast O(n)
-        coverage = (mosaic > 0).sum() / mosaic.size * 100
+        # Calculate final stats (segment_counts_before already computed above)
+        segment_counts = np.bincount(mosaic.ravel())
 
-        # Segments before/after merge
-        n_segments_before_merge = int((np.bincount(mosaic_before_merge.ravel()) > 0).sum()) - 1
+        # Segment counts (exclude background at index 0)
+        n_segments = int((segment_counts[1:] > 0).sum()) if len(segment_counts) > 1 else 0
+        n_segments_before_merge = int((segment_counts_before[1:] > 0).sum()) if len(segment_counts_before) > 1 else 0
+
+        # Coverage from the same bincount
+        coverage = (mosaic.size - segment_counts[0]) / mosaic.size * 100
+
+        # Merge stats
         merge_stats["segments_before_merge"] = n_segments_before_merge
         merge_stats["segments_after_merge"] = n_segments
         merge_stats["segments_reduced"] = n_segments_before_merge - n_segments
 
-        # Segment size statistics
-        segment_areas = np.bincount(mosaic.ravel())
-        segment_areas = segment_areas[segment_areas > 0]  # Remove zero counts
-        if len(segment_areas) > 1:
-            segment_areas = segment_areas[1:]  # Remove background (label 0)
+        # Segment size statistics (reuse segment_counts, exclude background)
+        segment_areas = segment_counts[1:]  # Exclude background (index 0)
+        segment_areas = segment_areas[segment_areas > 0]  # Remove empty labels
         segment_size_stats = {
             "mean": float(np.mean(segment_areas)) if len(segment_areas) > 0 else 0,
             "median": float(np.median(segment_areas)) if len(segment_areas) > 0 else 0,
@@ -288,32 +318,29 @@ class Pipeline:
             if verbose:
                 print(f"  Labels (final):        {labels_path}")
 
-        if self.config.output.save_shapefile:
-            from sam_mosaic.vectorize import vectorize_labels
-            shapefile_path = output_dir / "segments.shp"
-            vectorize_labels(
-                mosaic,
-                shapefile_path,
-                crs=self._metadata.crs,
-                transform=self._metadata.transform,
-                simplify_tolerance=self.config.output.simplify_tolerance
-            )
-            result.shapefile_path = shapefile_path
-            if verbose:
-                print(f"  Shapefile: {shapefile_path}")
+        # Vectorize once, save to multiple formats if needed
+        if self.config.output.save_shapefile or self.config.output.save_geopackage:
+            from sam_mosaic.vectorize.polygonize import extract_polygons, save_shapefile, save_geopackage
 
-        if self.config.output.save_geopackage:
-            from sam_mosaic.vectorize import vectorize_labels
-            geopackage_path = output_dir / "segments.gpkg"
-            vectorize_labels(
+            # Extract polygons once (expensive operation)
+            features = extract_polygons(
                 mosaic,
-                geopackage_path,
-                crs=self._metadata.crs,
                 transform=self._metadata.transform,
                 simplify_tolerance=self.config.output.simplify_tolerance
             )
-            if verbose:
-                print(f"  GeoPackage: {geopackage_path}")
+
+            if self.config.output.save_shapefile:
+                shapefile_path = output_dir / "segments.shp"
+                save_shapefile(features, shapefile_path, crs=self._metadata.crs)
+                result.shapefile_path = shapefile_path
+                if verbose:
+                    print(f"  Shapefile: {shapefile_path}")
+
+            if self.config.output.save_geopackage:
+                geopackage_path = output_dir / "segments.gpkg"
+                save_geopackage(features, geopackage_path, crs=self._metadata.crs)
+                if verbose:
+                    print(f"  GeoPackage: {geopackage_path}")
 
         if self.config.output.save_stats:
             import json
@@ -365,6 +392,7 @@ class Pipeline:
                 print(f"  Stats:     {stats_path}")
 
         # Cleanup
+        mosaic_writer.close()
         self._predictor.unload_model()
         self._predictor = None
 

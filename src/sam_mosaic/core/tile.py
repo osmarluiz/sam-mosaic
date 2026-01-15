@@ -89,41 +89,6 @@ def process_tile(
     )
 
 
-def place_tile_in_mosaic(
-    mosaic: np.ndarray,
-    tile_result: TileResult,
-    tile_size: int,
-    label_offset: int = 0
-) -> int:
-    """Place tile labels into the full mosaic array.
-
-    Args:
-        mosaic: Full mosaic label array to update in-place.
-        tile_result: Result from process_tile.
-        tile_size: Tile size (should match tile_result.labels.shape).
-        label_offset: NOT USED - kept for API compatibility.
-                      Labels already have correct IDs from process_tile.
-
-    Returns:
-        Maximum label ID used (for next tile's offset).
-    """
-    row = tile_result.row
-    col = tile_result.col
-
-    y_start = row * tile_size
-    x_start = col * tile_size
-
-    # Labels already have correct IDs from process_tile (start_label parameter)
-    # DO NOT add offset again - that was causing exponential growth of label IDs!
-    labels = tile_result.labels
-
-    # Place in mosaic
-    mosaic[y_start:y_start + tile_size, x_start:x_start + tile_size] = labels
-
-    # Return max label for next offset
-    return int(labels.max()) if labels.max() > 0 else label_offset
-
-
 def calculate_grid_dimensions(
     image_width: int,
     image_height: int,

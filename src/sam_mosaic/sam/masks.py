@@ -138,36 +138,3 @@ def convert_masks_to_labels(
         labels[mask.data.astype(bool)] = label_id
 
     return labels
-
-
-def filter_overlapping_masks(
-    masks: list[Mask],
-    iou_threshold: float = 0.5
-) -> list[Mask]:
-    """Remove masks that overlap significantly with higher-scored masks.
-
-    Masks are processed in order of decreasing score. A mask is removed
-    if it overlaps with any already-kept mask above the IoU threshold.
-
-    Args:
-        masks: List of Mask objects.
-        iou_threshold: Maximum allowed IoU overlap.
-
-    Returns:
-        Filtered list of non-overlapping masks.
-    """
-    if not masks:
-        return []
-
-    # Sort by score descending
-    sorted_masks = sorted(masks, key=lambda m: m.score, reverse=True)
-
-    kept = []
-    for mask in sorted_masks:
-        # Check overlap with all kept masks
-        overlaps = any(mask.overlaps_with(k, iou_threshold) for k in kept)
-
-        if not overlaps:
-            kept.append(mask)
-
-    return kept

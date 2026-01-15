@@ -29,8 +29,10 @@ cd sam-mosaic
 pip install -e .
 
 # Install SAM2 (required dependency)
-pip install git+https://github.com/facebookresearch/sam2.git
+pip install sam2
 ```
+
+> **Note**: We recommend using the `sam2` package from PyPI (version 1.1.0+), which has been tested for stable GPU memory usage during large-scale processing.
 
 ### 2. Download SAM2 Model
 
@@ -237,16 +239,27 @@ After all tiles are processed, segments touching at tile boundaries are merged:
 - **Python**: 3.10+
 - **GPU**: NVIDIA GPU with CUDA (recommended). Works on CPU but much slower.
 - **RAM**: 16GB+ recommended for large images
+- **VRAM**: 8GB+ recommended (tested with 24GB GPU on 10k×10k images)
 - **Disk**: ~1GB for SAM2 checkpoint + space for outputs
 
 ### Dependencies
 
 - PyTorch 2.0+
-- SAM2 (Facebook)
+- SAM2 1.1.0+ (from PyPI)
 - rasterio
 - numpy, scipy, scikit-learn
 - shapely, fiona
 - tqdm, pyyaml
+
+### Tested Configuration
+
+| Component | Version |
+|-----------|---------|
+| Python | 3.10, 3.11 |
+| SAM2 | 1.1.0 |
+| PyTorch | 2.0+ |
+| CUDA | 12.6 |
+| NVIDIA Driver | 560.94 |
 
 ---
 
@@ -342,6 +355,7 @@ MIT License
 
 ## Acknowledgments
 
-- [SAM2](https://github.com/facebookresearch/sam2) by Meta AI
+- [SAM2](https://github.com/facebookresearch/sam2) by Meta AI - Segment Anything Model 2
+- [sam2 PyPI package](https://pypi.org/project/sam2/) - SAM2 distribution used in this project
 - [rasterio](https://rasterio.readthedocs.io/) for GeoTIFF handling
 - [shapely](https://shapely.readthedocs.io/) and [fiona](https://fiona.readthedocs.io/) for vector operations

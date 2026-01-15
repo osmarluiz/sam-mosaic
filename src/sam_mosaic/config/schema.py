@@ -98,12 +98,17 @@ class OutputConfig:
         save_geopackage: Whether to save GeoPackage.
         save_stats: Whether to save detailed stats JSON.
         simplify_tolerance: Polygon simplification tolerance in map units (0 = no simplification).
+        streaming_mode: Mosaic storage mode - "auto", "ram", or "disk".
+            - "auto": Uses disk streaming for large images (> 30% of available RAM).
+            - "ram": Always keep mosaic in memory (faster for small images).
+            - "disk": Always stream to disk (lower memory usage for large images).
     """
     save_labels: bool = True
     save_shapefile: bool = True
     save_geopackage: bool = False
     save_stats: bool = True
     simplify_tolerance: float = 1.0
+    streaming_mode: str = "auto"
 
 
 @dataclass
@@ -145,6 +150,8 @@ class Config:
             raise ValueError(f"segmentation.target_coverage must be in (0, 100], got {self.segmentation.target_coverage}")
         if self.segmentation.points_per_side <= 0:
             raise ValueError(f"segmentation.points_per_side must be positive, got {self.segmentation.points_per_side}")
+        if self.output.streaming_mode not in ("auto", "ram", "disk"):
+            raise ValueError(f"output.streaming_mode must be 'auto', 'ram', or 'disk', got {self.output.streaming_mode}")
 
     @classmethod
     def with_overrides(cls, base: "Config", **overrides) -> "Config":
@@ -181,6 +188,7 @@ class Config:
             "save_shapefile": ("output", "save_shapefile"),
             "save_geopackage": ("output", "save_geopackage"),
             "simplify_tolerance": ("output", "simplify_tolerance"),
+            "streaming_mode": ("output", "streaming_mode"),
             "sam_checkpoint": (None, "sam_checkpoint"),
         }
 
