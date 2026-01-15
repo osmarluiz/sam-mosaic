@@ -20,6 +20,20 @@ Segment large remote sensing images (satellite, aerial, drone) that don't fit in
 
 ### 1. Install
 
+**Option A: Using conda (recommended for exact reproducibility)**
+
+```bash
+# Clone the repository
+git clone https://github.com/osmarluiz/sam-mosaic.git
+cd sam-mosaic
+
+# Create conda environment from file
+conda env create -f environment.yml
+conda activate ts_annotator
+```
+
+**Option B: Manual installation**
+
 ```bash
 # Clone the repository
 git clone https://github.com/osmarluiz/sam-mosaic.git
