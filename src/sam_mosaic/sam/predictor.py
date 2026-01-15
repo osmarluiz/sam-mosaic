@@ -50,29 +50,52 @@ class SAMPredictor:
         self._predictor = None
         self._current_image = None
 
-    def load_model(self) -> None:
+    def load_model(self, debug: bool = False) -> None:
         """Load SAM2 model into memory.
+
+        Args:
+            debug: If True, print debug messages during loading.
 
         Raises:
             ImportError: If sam2 package is not installed.
             FileNotFoundError: If checkpoint file doesn't exist.
         """
+        import sys
+
+        def _debug(msg):
+            if debug:
+                print(f"[DEBUG] {msg}", flush=True)
+
         if self._model is not None:
+            _debug("Model already loaded, skipping")
             return
+
+        _debug(f"Checkpoint path: {self.checkpoint_path}")
+        _debug(f"Model config: {self.model_cfg}")
+        _debug(f"Device: {self.device}")
 
         if not self.checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
 
         try:
+            _debug("Importing sam2.build_sam...")
             from sam2.build_sam import build_sam2
+            _debug("Importing sam2.sam2_image_predictor...")
             from sam2.sam2_image_predictor import SAM2ImagePredictor
+            _debug("Imports complete")
 
+            _debug("Calling build_sam2()...")
+            sys.stdout.flush()
             self._model = build_sam2(
                 self.model_cfg,
                 str(self.checkpoint_path),
                 device=self.device
             )
+            _debug("build_sam2() complete")
+
+            _debug("Creating SAM2ImagePredictor...")
             self._predictor = SAM2ImagePredictor(self._model)
+            _debug("SAM2ImagePredictor created")
 
         except ImportError as e:
             raise ImportError(

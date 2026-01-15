@@ -113,13 +113,22 @@ class Pipeline:
             print(f"  Image:  {self._metadata.width} x {self._metadata.height}")
             print(f"  Tiles:  {n_cols} x {n_rows} = {total_tiles}")
             print("-" * 60)
-            print("Loading SAM2 model...", end=" ", flush=True)
+
+        # Check for debug mode via environment variable
+        import os
+        debug_mode = os.environ.get("SAM_MOSAIC_DEBUG", "").lower() in ("1", "true", "yes")
+
+        if verbose:
+            if debug_mode:
+                print("Loading SAM2 model (DEBUG MODE)...")
+            else:
+                print("Loading SAM2 model...", end=" ", flush=True)
 
         # Initialize predictor
         self._predictor = SAMPredictor(self.config.sam_checkpoint)
-        self._predictor.load_model()
+        self._predictor.load_model(debug=debug_mode)
 
-        if verbose:
+        if verbose and not debug_mode:
             print("OK")
 
         # Initialize mosaic writer
