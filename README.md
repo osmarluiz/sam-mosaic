@@ -42,11 +42,11 @@ cd sam-mosaic
 # Install the package
 pip install -e .
 
-# Install SAM2 (required dependency)
+# Install SAM2 from PyPI (recommended)
 pip install sam2
 ```
 
-> **Note**: We recommend using the `sam2` package from PyPI (version 1.1.0+), which has been tested for stable GPU memory usage during large-scale processing.
+> **Important - SAM2 Version**: We use `sam2` from PyPI ([JinsuaFeito-dev fork](https://github.com/JinsuaFeito-dev/segment-anything-2)), NOT the official Facebook repository. This version (1.1.0+) has been tested for stable GPU memory usage during large-scale processing. Do NOT install from `pip install git+https://github.com/facebookresearch/sam2.git` as it may cause memory leaks.
 
 ### 2. Download SAM2 Model
 
@@ -343,6 +343,34 @@ Increase padding:
 ```bash
 sam-mosaic input.tif output/ --padding 100
 ```
+
+### OpenMP library conflict (Windows)
+
+If you see an error about `libomp.dll` and `libiomp5md.dll` conflict:
+
+```powershell
+# PowerShell - set before running
+$env:KMP_DUPLICATE_LIB_OK='TRUE'
+sam-mosaic input.tif output/
+```
+
+```bash
+# Bash/CMD
+set KMP_DUPLICATE_LIB_OK=TRUE
+sam-mosaic input.tif output/
+```
+
+### CLI hangs at "Loading SAM2 model..."
+
+Enable debug mode to identify where it hangs:
+
+```powershell
+$env:SAM_MOSAIC_DEBUG='1'
+$env:KMP_DUPLICATE_LIB_OK='TRUE'
+sam-mosaic input.tif output/ --checkpoint path/to/sam2.pt
+```
+
+This will print detailed loading steps. The last `[DEBUG]` message before hanging indicates the problem.
 
 ---
 
