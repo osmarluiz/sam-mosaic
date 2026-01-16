@@ -189,6 +189,7 @@ def run_multipass_segmentation(
 
         # Stop if we reached target coverage
         if coverage >= seg_config.target_coverage:
+            del masks  # Free memory before break
             pass_idx += 1
             break
 
@@ -196,15 +197,20 @@ def run_multipass_segmentation(
         if len(masks) == 0 or masks_added == 0:
             # No masks generated or all filtered - reduce threshold
             if current_iou <= threshold_config.iou_end:
+                del masks  # Free memory before break
                 break
             current_iou = max(threshold_config.iou_end, current_iou - threshold_config.step)
             current_stab = max(threshold_config.stability_end, current_stab - threshold_config.step)
         elif coverage_gain < 0.1:
             # Masks added but coverage didn't increase much - reduce threshold
             if current_iou <= threshold_config.iou_end:
+                del masks  # Free memory before break
                 break
             current_iou = max(threshold_config.iou_end, current_iou - threshold_config.step)
             current_stab = max(threshold_config.stability_end, current_stab - threshold_config.step)
+
+        # Free masks list memory after processing
+        del masks
 
         prev_coverage = coverage
         pass_idx += 1
@@ -214,5 +220,9 @@ def run_multipass_segmentation(
     stats["total_masks"] = current_label - start_label
     stats["final_coverage"] = combined_mask.sum() / total_pixels * 100
     stats["final_iou"] = current_iou
+
+    # Free working_image buffer before returning
+    if working_image is not None:
+        del working_image
 
     return tile_labels, combined_mask, stats

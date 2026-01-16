@@ -88,6 +88,7 @@ def segment_with_params(
     save_shapefile: bool = True,
     save_geopackage: bool = False,
     simplify_tolerance: float = 1.0,
+    streaming_mode: str = "auto",
     verbose: bool = True
 ) -> SegmentationResult:
     """Segment with direct parameter control.
@@ -178,6 +179,7 @@ def segment_with_params(
             save_shapefile=save_shapefile,
             save_geopackage=save_geopackage,
             simplify_tolerance=simplify_tolerance,
+            streaming_mode=streaming_mode,
         ),
         sam_checkpoint=checkpoint,
     )

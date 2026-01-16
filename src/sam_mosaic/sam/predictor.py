@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Optional, List
+import gc
 import numpy as np
 import torch
 
@@ -177,6 +178,8 @@ class SAMPredictor:
 
         # Free generator memory immediately (prevents memory leak across tiles/passes)
         del generator
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # Convert to our Mask format
         masks = []
@@ -189,6 +192,9 @@ class SAMPredictor:
                 point=None  # Batched - no single point association
             ))
 
+        # Free mask_outputs memory
+        del mask_outputs
+
         return masks
 
     def reset_image(self) -> None:
@@ -196,6 +202,8 @@ class SAMPredictor:
         self._current_image = None
         if self._predictor is not None:
             self._predictor.reset_predictor()
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def unload_model(self) -> None:
         """Unload model from memory."""

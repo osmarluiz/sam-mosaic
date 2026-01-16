@@ -131,10 +131,25 @@ class Pipeline:
         if verbose and not debug_mode:
             print("OK")
 
+        if debug_mode:
+            import subprocess
+            def _get_vram():
+                try:
+                    r = subprocess.run(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+                                       capture_output=True, text=True, timeout=5)
+                    return int(r.stdout.strip()) if r.returncode == 0 else 0
+                except:
+                    return 0
+            print(f"[DEBUG] VRAM after model load: {_get_vram()} MB", flush=True)
+
         # Initialize mosaic writer
         mosaic_height = n_rows * tile_size
         mosaic_width = n_cols * tile_size
         streaming_mode = self.config.output.streaming_mode
+
+        if debug_mode:
+            print(f"[DEBUG] Creating mosaic writer ({streaming_mode} mode)...", flush=True)
+            print(f"[DEBUG] Mosaic size: {mosaic_width} x {mosaic_height} = {mosaic_width*mosaic_height/1e9:.2f} Gpixels", flush=True)
 
         mosaic_writer = create_mosaic_writer(
             height=mosaic_height,
@@ -147,10 +162,19 @@ class Pipeline:
 
         # Determine actual mode used (for verbose output)
         actual_mode = "disk" if type(mosaic_writer).__name__ == "DiskMosaic" else "ram"
+
+        if debug_mode:
+            print(f"[DEBUG] Mosaic writer created ({actual_mode})", flush=True)
+            print(f"[DEBUG] VRAM after mosaic writer: {_get_vram()} MB", flush=True)
+
         if verbose and streaming_mode == "auto":
             print(f"  Mosaic mode: {actual_mode} (auto-selected)")
 
         # Process tiles
+        if debug_mode:
+            print(f"[DEBUG] About to start processing tiles...", flush=True)
+            print(f"[DEBUG] VRAM before tile loop: {_get_vram()} MB", flush=True)
+
         if verbose:
             print("-" * 60)
             print(f"Processing {total_tiles} tiles...")
@@ -160,8 +184,14 @@ class Pipeline:
         tile_stats = []
         tile_start_time = time.time()
 
+        if debug_mode:
+            print(f"[DEBUG] Starting tile loop...", flush=True)
+
         for row in range(n_rows):
             for col in range(n_cols):
+                if debug_mode and row == 0 and col == 0:
+                    print(f"[DEBUG] Loading first tile...", flush=True)
+                    print(f"[DEBUG] VRAM before first tile: {_get_vram()} MB", flush=True)
                 tile_idx = row * n_cols + col + 1
 
                 # Load tile
