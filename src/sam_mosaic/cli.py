@@ -115,6 +115,17 @@ Examples:
         action="store_true",
         help="Use fixed threshold instead of adaptive"
     )
+    seg_group.add_argument(
+        "--point-strategy",
+        type=str,
+        choices=["kmeans", "dense_grid"],
+        help="Point selection strategy: 'kmeans' (default, good for large regions) or 'dense_grid' (good for urban/small objects)"
+    )
+    seg_group.add_argument(
+        "--erosion",
+        type=int,
+        help="Erosion iterations for point placement (default: 10 for kmeans, 5 recommended for dense_grid)"
+    )
 
     # Merge parameters
     merge_group = parser.add_argument_group("Merge parameters")
@@ -215,6 +226,10 @@ Examples:
         params["use_black_mask"] = False
     if args.no_adaptive_threshold:
         params["use_adaptive_threshold"] = False
+    if args.point_strategy is not None:
+        params["point_strategy"] = args.point_strategy
+    if args.erosion is not None:
+        params["erosion_iterations"] = args.erosion
     if args.min_contact is not None:
         params["min_contact_pixels"] = args.min_contact
     if args.min_area is not None:

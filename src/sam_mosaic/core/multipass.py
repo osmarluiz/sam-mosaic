@@ -7,7 +7,7 @@ from scipy import ndimage
 from sam_mosaic.config import SegmentationConfig, ThresholdConfig
 from sam_mosaic.sam import SAMPredictor, Mask, apply_black_mask
 from sam_mosaic.sam.masks import convert_masks_to_labels
-from sam_mosaic.points import make_uniform_grid, make_kmeans_points
+from sam_mosaic.points import make_uniform_grid, make_kmeans_points, make_dense_grid_points
 
 
 def run_multipass_segmentation(
@@ -84,9 +84,24 @@ def run_multipass_segmentation(
         if pass_idx == 0:
             points = base_points
         else:
-            # K-means points only in non-masked areas
-            valid_mask = combined_mask == 0
-            points = make_kmeans_points(valid_mask, n_points=64, erosion_iterations=10)
+            # Select points based on strategy
+            if seg_config.point_strategy == "dense_grid":
+                # Dense grid: same uniform grid, filtered by mask
+                # Good for urban/small objects
+                points = make_dense_grid_points(
+                    combined_mask,
+                    points_per_side=seg_config.points_per_side,
+                    erosion_iterations=seg_config.erosion_iterations
+                )
+            else:
+                # K-means (default): cluster points in residual areas
+                # Good for large homogeneous regions
+                valid_mask = combined_mask == 0
+                points = make_kmeans_points(
+                    valid_mask,
+                    n_points=64,
+                    erosion_iterations=seg_config.erosion_iterations
+                )
 
         if len(points) == 0:
             break

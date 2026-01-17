@@ -95,6 +95,8 @@ def _dict_to_config(data: dict) -> Config:
             max_passes=segmentation_data.get("max_passes"),
             use_black_mask=segmentation_data.get("use_black_mask", True),
             use_adaptive_threshold=segmentation_data.get("use_adaptive_threshold", True),
+            point_strategy=segmentation_data.get("point_strategy", "kmeans"),
+            erosion_iterations=segmentation_data.get("erosion_iterations", 10),
         ),
         merge=MergeConfig(
             min_contact_pixels=merge_data.get("min_contact_pixels", 5),
@@ -139,6 +141,8 @@ def _config_to_dict(config: Config) -> dict:
             "max_passes": config.segmentation.max_passes,
             "use_black_mask": config.segmentation.use_black_mask,
             "use_adaptive_threshold": config.segmentation.use_adaptive_threshold,
+            "point_strategy": config.segmentation.point_strategy,
+            "erosion_iterations": config.segmentation.erosion_iterations,
         },
         "merge": {
             "min_contact_pixels": config.merge.min_contact_pixels,

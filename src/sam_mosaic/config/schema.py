@@ -66,12 +66,22 @@ class SegmentationConfig:
         max_passes: Maximum number of passes (None = unlimited).
         use_black_mask: Whether to mask segmented areas with black.
         use_adaptive_threshold: Whether to decrease threshold each pass.
+        point_strategy: Strategy for point selection in subsequent passes.
+            - "kmeans": K-means clustering in residual areas (default).
+              Good for large homogeneous regions.
+            - "dense_grid": Fixed uniform grid, filtered by mask.
+              Good for urban/small objects (cars, buildings).
+        erosion_iterations: Iterations to erode valid area before placing points.
+            Larger values keep points away from edges.
+            Default: 10 for kmeans, 5 recommended for dense_grid.
     """
     points_per_side: int = 64
     target_coverage: float = 99.0
     max_passes: Optional[int] = None
     use_black_mask: bool = True
     use_adaptive_threshold: bool = True
+    point_strategy: str = "kmeans"
+    erosion_iterations: int = 10
 
 
 @dataclass
@@ -150,6 +160,10 @@ class Config:
             raise ValueError(f"segmentation.target_coverage must be in (0, 100], got {self.segmentation.target_coverage}")
         if self.segmentation.points_per_side <= 0:
             raise ValueError(f"segmentation.points_per_side must be positive, got {self.segmentation.points_per_side}")
+        if self.segmentation.point_strategy not in ("kmeans", "dense_grid"):
+            raise ValueError(f"segmentation.point_strategy must be 'kmeans' or 'dense_grid', got {self.segmentation.point_strategy}")
+        if self.segmentation.erosion_iterations < 0:
+            raise ValueError(f"segmentation.erosion_iterations must be non-negative, got {self.segmentation.erosion_iterations}")
         if self.output.streaming_mode not in ("auto", "ram", "disk"):
             raise ValueError(f"output.streaming_mode must be 'auto', 'ram', or 'disk', got {self.output.streaming_mode}")
 
@@ -181,6 +195,8 @@ class Config:
             "max_passes": ("segmentation", "max_passes"),
             "use_black_mask": ("segmentation", "use_black_mask"),
             "use_adaptive_threshold": ("segmentation", "use_adaptive_threshold"),
+            "point_strategy": ("segmentation", "point_strategy"),
+            "erosion_iterations": ("segmentation", "erosion_iterations"),
             "min_contact_pixels": ("merge", "min_contact_pixels"),
             "min_mask_area": ("merge", "min_mask_area"),
             "merge_enclosed_max_area": ("merge", "merge_enclosed_max_area"),

@@ -414,6 +414,8 @@ class Pipeline:
                         "max_passes": self.config.segmentation.max_passes,
                         "use_black_mask": self.config.segmentation.use_black_mask,
                         "use_adaptive_threshold": self.config.segmentation.use_adaptive_threshold,
+                        "point_strategy": self.config.segmentation.point_strategy,
+                        "erosion_iterations": self.config.segmentation.erosion_iterations,
                     },
                     "merge": {
                         "min_contact_pixels": self.config.merge.min_contact_pixels,

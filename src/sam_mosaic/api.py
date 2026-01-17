@@ -79,6 +79,8 @@ def segment_with_params(
     max_passes: Optional[int] = None,
     use_black_mask: bool = True,
     use_adaptive_threshold: bool = True,
+    point_strategy: str = "kmeans",
+    erosion_iterations: int = 10,
     # Merge parameters
     min_contact_pixels: int = 5,
     min_mask_area: int = 100,
@@ -115,6 +117,10 @@ def segment_with_params(
         max_passes: Maximum passes per tile (default None = unlimited).
         use_black_mask: Whether to mask segmented areas (default True).
         use_adaptive_threshold: Whether to decrease threshold (default True).
+        point_strategy: Point selection strategy - "kmeans" (default, good for
+            large regions) or "dense_grid" (good for urban/small objects).
+        erosion_iterations: Erosion iterations for point placement (default 10).
+            Use 5 for dense_grid to capture small objects near edges.
 
         min_contact_pixels: Minimum contact for merge (default 5).
         min_mask_area: Minimum region area to keep (default 100).
@@ -168,6 +174,8 @@ def segment_with_params(
             max_passes=max_passes,
             use_black_mask=use_black_mask,
             use_adaptive_threshold=use_adaptive_threshold,
+            point_strategy=point_strategy,
+            erosion_iterations=erosion_iterations,
         ),
         merge=MergeConfig(
             min_contact_pixels=min_contact_pixels,
