@@ -83,6 +83,16 @@ Examples:
         help="Final IoU threshold (default: 0.60)"
     )
     threshold_group.add_argument(
+        "--stability-start",
+        type=float,
+        help="Initial stability threshold (default: 0.93)"
+    )
+    threshold_group.add_argument(
+        "--stability-end",
+        type=float,
+        help="Final stability threshold (default: 0.60)"
+    )
+    threshold_group.add_argument(
         "--threshold-step",
         type=float,
         help="Threshold decrease per pass (default: 0.01)"
@@ -214,6 +224,10 @@ Examples:
         params["iou_start"] = args.iou_start
     if args.iou_end is not None:
         params["iou_end"] = args.iou_end
+    if args.stability_start is not None:
+        params["stability_start"] = args.stability_start
+    if args.stability_end is not None:
+        params["stability_end"] = args.stability_end
     if args.threshold_step is not None:
         params["threshold_step"] = args.threshold_step
     if args.points_per_side is not None:
