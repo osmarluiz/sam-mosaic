@@ -9,7 +9,7 @@ Segment large remote sensing images (satellite, aerial, drone) that don't fit in
 - **Multi-pass segmentation** with adaptive thresholds for high coverage (>99%)
 - **Black mask focusing** to help SAM segment residual areas efficiently
 - **Optimized merge** at tile boundaries using LUT + Union-Find (O(n) complexity)
-- **K-means point placement** in residual areas for better distribution
+- **Flexible point strategies**: K-means (default) or dense grid for urban/small objects
 - **Adaptive tile padding** to ensure clean merges at boundaries
 - **GeoTIFF support** with CRS and georeferencing preservation
 - **Multiple output formats**: Raster labels (TIFF) + Vector polygons (Shapefile/GeoPackage)
@@ -145,6 +145,52 @@ After running, the output directory will contain:
 | `--padding` | 50 | Extra context pixels around each tile. Helps with boundary merging. |
 | `--min-area` | 100 | Remove segments smaller than this (in pixels). |
 | `--target-coverage` | 99.0 | Stop segmentation when this coverage % is reached. |
+| `--point-strategy` | kmeans | Point selection: `kmeans` (large regions) or `dense_grid` (urban/small objects). |
+| `--erosion` | 10 | Erosion iterations for point placement. Use 5 for dense_grid. |
+| `--iou-start` | 0.93 | Initial IoU threshold (restrictive). |
+| `--iou-end` | 0.60 | Final IoU threshold (permissive). |
+| `--stability-start` | 0.93 | Initial stability score threshold. |
+| `--stability-end` | 0.60 | Final stability score threshold. |
+
+### Point Strategies
+
+SAM-Mosaic supports two point selection strategies for multi-pass segmentation:
+
+**K-means (default)**: Clusters points in residual (unsegmented) areas. Best for images with large, homogeneous regions like agricultural fields or forests.
+
+**Dense Grid**: Uses a uniform grid filtered by already-segmented areas. Best for urban imagery with many small, scattered objects like cars, buildings, or infrastructure.
+
+```bash
+# Default: K-means for large regions
+sam-mosaic input.tif output/ --checkpoint sam2.pt
+
+# Dense grid for urban/small objects
+sam-mosaic input.tif output/ --checkpoint sam2.pt \
+    --point-strategy dense_grid --erosion 5
+
+# Dense grid with higher point density for very small objects
+sam-mosaic input.tif output/ --checkpoint sam2.pt \
+    --point-strategy dense_grid --points-per-side 96 --erosion 3
+```
+
+### Threshold Parameters
+
+SAM2 uses two thresholds to filter predicted masks:
+
+- **IoU threshold** (`--iou-start`, `--iou-end`): Filters masks by predicted IoU score
+- **Stability threshold** (`--stability-start`, `--stability-end`): Filters masks by stability score
+
+Both thresholds decrease from start to end across passes, allowing more permissive masks as coverage increases.
+
+```bash
+# More restrictive (fewer but higher quality segments)
+sam-mosaic input.tif output/ --checkpoint sam2.pt \
+    --iou-start 0.95 --stability-start 0.95
+
+# More permissive (higher coverage, may include lower quality segments)
+sam-mosaic input.tif output/ --checkpoint sam2.pt \
+    --iou-end 0.50 --stability-end 0.50
+```
 
 ### Polygon Simplification Examples
 
@@ -305,6 +351,22 @@ result = segment_with_params(
     "input.tif", "output/no_padding/",
     checkpoint="checkpoints/sam2.1_hiera_large.pt",
     padding=0
+)
+
+# Dense grid for urban imagery
+result = segment_with_params(
+    "input.tif", "output/urban/",
+    checkpoint="checkpoints/sam2.1_hiera_large.pt",
+    point_strategy="dense_grid",
+    erosion_iterations=5
+)
+
+# Custom stability thresholds
+result = segment_with_params(
+    "input.tif", "output/custom_thresholds/",
+    checkpoint="checkpoints/sam2.1_hiera_large.pt",
+    stability_start=0.90,
+    stability_end=0.50
 )
 ```
 
