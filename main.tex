@@ -520,7 +520,16 @@ Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection i
 \subsection{Boundary Merge Evaluation}
 \label{sec:res_boundary}
 
-Table~\ref{tab:merge_strategy} compares the best-match strategy against a naive baseline that merges any pair of segments sharing at least one pixel of contact across a tile boundary. The naive approach merges aggressively, joining unrelated segments that share incidental boundary contact. The best-match strategy avoids these spurious merges by requiring each segment to commit to exactly one partner, the neighbor with the highest contact area, while remaining parameter-free. Coverage is identical under both strategies; only segment count and merge count differ.
+Fig.~\ref{fig:merge} illustrates the effect of the merge strategy on three datasets. The naive baseline merges any pair of segments sharing at least one pixel of contact across a tile boundary, propagating merges transitively through Union-Find. This aggressive strategy joins unrelated segments: in the BSB-1 example, multiple buildings and vegetation areas are fused into a single segment spanning the tile corner. In the Potsdam-1 example, the naive merge creates a mega-segment covering 83\% of the crop. The best-match strategy avoids these spurious merges by requiring each segment to commit to exactly one partner, the neighbor with the highest contact area. Coverage is identical under both strategies; only segment count and merge quality differ.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig5_merge.png}
+    \caption{Boundary merge comparison across three datasets. Each row shows a crop centered on a tile boundary (red dashed lines). Before merge: independent per-tile segments with different labels on each side. Naive merge: all touching segments are merged transitively, creating spurious mega-segments that span unrelated objects. Best-match merge: each segment merges only with its highest-contact neighbor, preserving object identity across tile boundaries.}
+    \label{fig:merge}
+\end{figure}
+
+Table~\ref{tab:merge_strategy} quantifies this difference across all scenes.
 
 \begin{table}[t]
 \centering
