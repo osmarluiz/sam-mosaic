@@ -5,6 +5,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{hyperref}
 \usepackage{multirow}
 \usepackage{xcolor}
@@ -403,9 +404,13 @@ The tile size $T$ controls a fundamental tradeoff: smaller tiles increase the nu
 
 \subsubsection{Experiment~4: Segmentation quality assessment}
 
-To evaluate whether the generated segments correspond to real-world objects, the BSB-1 scene is compared against a manually digitized ground truth (GT) containing 11{,}645~polygons across eight land cover classes (buildings, trees, cars, swimming pools, roads, sports courts, decks, and lakes). The analysis is GT-centric: for each GT polygon, all overlapping SAM segments are merged (union), and metrics are computed against this reconstructed object. This many-to-one matching protocol does not penalize over-segmentation, which is acceptable in this context since SAM segments by visual appearance rather than by semantic class. A building split into multiple roof segments is not an error; the error occurs when a single segment merges distinct objects (under-segmentation).
+To evaluate whether the generated segments correspond to real-world objects, each scene with available ground truth (GT) is evaluated against manually digitized polygons with land cover class labels. The BSB-1 scene contains 11{,}645~GT polygons across eight classes (buildings, trees, cars, swimming pools, roads, sports courts, decks, and lakes). \todo{Add Potsdam and Plant23 GT descriptions when available.}
 
-Seven pipeline configurations are compared, spanning the full ablation sequence (AMG baselines through the full RemoteSAMsing pipeline at tile sizes 1{,}000 and 250), to assess how each component affects segmentation quality relative to real objects.
+The evaluation follows two complementary protocols. First, \textit{Achievable Segmentation Accuracy} (ASA) \citep{stutz2018superpixels} quantifies global superpixel quality: each SAM segment is assigned the majority GT class label among its pixels, and ASA is the fraction of GT-covered pixels that receive the correct label. This standard superpixel benchmark metric directly answers whether the segments are suitable as input units for OBIA classification. ASA is computed over the GT-covered area only.
+
+Second, an \textit{object-level} protocol evaluates whether individual GT objects are correctly delineated. For each GT polygon, all overlapping SAM segments are identified. A segment qualifies for inclusion if more than 20\% of its total area falls inside the GT polygon; segments below this threshold are excluded as incidental overlap from spatially large segments that extend far beyond the object. The qualifying segments are merged (union) into a single reconstructed object, and metrics are computed between this reconstruction and the GT polygon. This filtering step is necessary because RemoteSAMsing's multi-pass strategy can produce large segments in early passes that cover multiple objects; without filtering, a single segment spanning an entire parking lot would count as a correct detection of every car it overlaps. Sensitivity analysis across thresholds from 5\% to 50\% confirms that results are stable within the 10--30\% range.
+
+Nine pipeline configurations are compared: three AMG single-pass baselines ($\tau \in \{0.93, 0.86, 0.70\}$) and the full RemoteSAMsing pipeline with both point strategies at three tile sizes ($T \in \{250, 500, 1{,}000\}$).
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
@@ -416,15 +421,9 @@ Seven pipeline configurations are compared, spanning the full ablation sequence 
 
 \textbf{Processing time} is the total wall-clock time in seconds, including model loading, tile processing, boundary merging, and output saving.
 
-Since RemoteSAMsing produces class-agnostic segments where over-segmentation is acceptable, the GT-based evaluation adopts a many-to-one matching protocol. For each GT polygon, all overlapping SAM segments are merged into a single reconstructed object, and metrics are computed against this union.
+\textbf{Achievable Segmentation Accuracy} (ASA) \citep{stutz2018superpixels} is a standard superpixel quality metric. Each segment is assigned the GT class label that covers the majority of its pixels within the GT-annotated area. ASA is the fraction of GT pixels whose segment received the correct class label. An ASA of 100\% means every segment lies entirely within a single GT class; lower values indicate segments that cross class boundaries. ASA is reported globally and per class.
 
-\textbf{Completeness} (\%) is the proportion of GT objects detected, where a GT polygon counts as detected if more than 50\% of its area is covered by SAM segments \cite{heipke1997evaluation}. This measures object-level detection performance.
-
-\textbf{Correctness} (\%) is the proportion of SAM segments that correspond to a GT object, where a segment is considered matched if more than 50\% of its area falls inside any GT polygon. A lower correctness indicates that many segments cover areas not represented in the GT (e.g., roads, bare soil, vegetation not annotated).
-
-\textbf{Class contamination rate} quantifies under-segmentation---the primary error of interest. For each GT polygon, the SAM segments covering more than 10\% of the GT area are identified. The contamination rate is the fraction of these segments' area that falls inside GT polygons of a \textit{different} class. A building's SAM segment that extends into an adjacent tree canopy produces high contamination. A building split into multiple SAM segments (over-segmentation) does not.
-
-\textbf{Boundary IoU} measures boundary alignment quality within a narrow band around the GT boundary \cite{cheng2021boundary}. For each GT polygon and its merged SAM reconstruction, the IoU is computed only within a 1~m buffer of the GT boundary, ignoring interior regions. This metric is sensitive to contour precision rather than area overlap, highlighting whether SAM segment boundaries align with real object edges.
+The object-level protocol produces four metrics. \textbf{Detection rate} (\%) is the proportion of GT objects for which at least one qualifying SAM segment exists (i.e., a segment with more than 20\% of its area inside the GT polygon). Objects covered exclusively by non-qualifying segments---large segments that extend far beyond the object boundaries---are classified as \textit{giant-covered} rather than detected; objects with no overlapping segment at all are classified as \textit{missed}. \textbf{Object IoU} is the intersection-over-union between the merged qualifying segments and the GT polygon, computed only for detected objects. \textbf{Object recall} is the fraction of the GT polygon area covered by the merged segments, measuring completeness of the reconstruction. \textbf{Mean segments per object} ($\bar{n}$) quantifies the degree of over-segmentation: a building reconstructed from five roof and shadow segments has $\bar{n} = 5$.
 
 % ============================================================================
 \section{Results}
@@ -535,54 +534,80 @@ Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 \\
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:gt_global} presents object-level detection and quality metrics for BSB-1, evaluated against 11{,}645 manually digitized GT polygons across eight land cover classes. Three configurations are compared: the AMG baseline (single-pass, $\tau = 0.88$), the full RemoteSAMsing pipeline at $T = 1{,}000$, and the Dense Grid variant at $T = 250$.
+Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on BSB-1, evaluated against 11{,}645 manually digitized GT polygons covering 52.8\% of the image area across eight land cover classes.
 
 \begin{table}[t]
 \centering
-\caption{Object-level segmentation quality on BSB-1 (11{,}645 GT polygons, 8 classes). Compl. = Completeness, Corr. = Correctness, BIoU = Boundary IoU, C$>$10\% = fraction of GT objects with class contamination exceeding 10\%.}
-\label{tab:gt_global}
-\begin{tabular}{lrrrrrr}
+\caption{Achievable Segmentation Accuracy (ASA) on BSB-1. ASA is computed over GT-covered pixels only. Cov.\ = fraction of GT area covered by SAM segments.}
+\label{tab:asa_global}
+\begin{tabular}{lrr}
 \toprule
-Configuration & Seg. & Compl. & Corr. & BIoU & C$>$10\% & Mean~C \\
- & & (\%) & (\%) & & (\%) & \\
+Configuration & ASA (\%) & Cov.\ (\%) \\
 \midrule
-AMG baseline ($\tau = 0.88$, 64~pts) & 9{,}231 & 54.5 & 70.7 & 0.341 & 10.3 & 0.071 \\
-RemoteSAMsing ($T = 1{,}000$) & 16{,}330 & 95.2 & 54.1 & 0.452 & 38.6 & 0.299 \\
-Dense Grid ($T = 250$) & 34{,}744 & 99.4 & 46.6 & 0.476 & 24.2 & 0.158 \\
+Single pass ($\tau = 0.93$) & 65.7 & 41.5 \\
+Single pass ($\tau = 0.86$) & 79.1 & 67.1 \\
+Single pass ($\tau = 0.70$) & 91.8 & 87.0 \\
+K-means ($T = 1{,}000$)     & 95.4 & 95.3 \\
+Dense Grid ($T = 1{,}000$)  & 95.2 & 95.3 \\
+Dense Grid ($T = 500$)      & 97.5 & 98.3 \\
+Dense Grid ($T = 250$)      & 97.6 & 98.8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Completeness increases from 54.5\% (AMG baseline) to 95.2\% (RemoteSAMsing) and 99.4\% (Dense Grid, $T = 250$), confirming that the coverage gains reported in Section~\ref{sec:res_ablation} translate into real object detection. Correctness decreases from 70.7\% to 46.6\% as the pipeline generates more segments; this is partially an artifact of GT incompleteness, since segments covering unannotated land cover (bare soil, sidewalks) are counted as false positives. Boundary IoU improves from 0.34 to 0.48, indicating that SAM2's contour precision increases with object detection---once an object is found, the boundary is delineated at consistent quality.
+Single-pass SAM2 at the strictest threshold ($\tau = 0.93$) achieves only 65.7\% ASA because large portions of the image remain unsegmented. The multi-pass pipeline raises ASA to 95.2--95.4\% at $T = 1{,}000$, with marginal further gains at smaller tile sizes (97.6\% at $T = 250$). The high ASA indicates that the vast majority of SAM2 segment boundaries align with real land cover boundaries rather than crossing them.
 
-Class contamination at $T = 1{,}000$ reaches 38.6\%, driven by small objects whose SAM segments extend beyond their boundaries. Reducing the tile size to $T = 250$ lowers contamination to 24.2\% while simultaneously increasing completeness, as smaller tiles produce more spatially contained segments.
-
-Table~\ref{tab:gt_class} breaks down these metrics by object class, revealing class-dependent behavior.
+Table~\ref{tab:asa_class} shows per-class ASA, revealing that the global value masks substantial variation across object types.
 
 \begin{table}[t]
 \centering
-\caption{Per-class segmentation quality on BSB-1. Compl. = Completeness (\%), C$>$10\% = contamination rate (\%), BIoU = Boundary IoU, $\bar{n}$ = mean SAM segments per GT object.}
-\label{tab:gt_class}
-\begin{tabular}{lrrrr|rrrr}
+\caption{Per-class ASA (\%) on BSB-1. Pixel counts reflect the relative contribution of each class to the GT area (total: 33.8M~pixels).}
+\label{tab:asa_class}
+\begin{tabular}{lrrrrrrr}
 \toprule
- & \multicolumn{4}{c|}{RemoteSAMsing ($T = 1{,}000$)} & \multicolumn{4}{c}{Dense Grid ($T = 250$)} \\
-\cmidrule(lr){2-5} \cmidrule(lr){6-9}
-Class & Compl. & C$>$10\% & BIoU & $\bar{n}$ & Compl. & C$>$10\% & BIoU & $\bar{n}$ \\
+Config & Build. & Trees & Cars & Pools & Roads & Courts & Lakes \\
+       & (33\%) & (36\%) & (1\%) & (2\%) & (17\%) & (1\%) & (10\%) \\
 \midrule
-Buildings (2{,}063)   & 98.6 &  19.7 & 0.517 &  3.5 & 99.8 &  10.0 & 0.494 &  7.2 \\
-Trees (5{,}473)       & 95.9 &  23.5 & 0.476 &  2.6 & 99.8 &   8.0 & 0.519 &  4.5 \\
-Cars (1{,}757)        & 89.3 &  86.9 & 0.400 &  1.4 & 99.0 &  73.4 & 0.433 &  2.2 \\
-Pools (1{,}157)       & 99.7 &  41.2 & 0.467 &  1.6 & 100.0 &  19.6 & 0.453 &  2.5 \\
-Roads (327)           & 94.8 &  87.5 & 0.088 &  9.3 & 92.0 &  89.0 & 0.089 & 16.6 \\
+SP ($\tau = 0.93$)  & 54.7 & 99.9 &  1.2 & 22.9 &  5.4 & 89.0 & 97.6 \\
+SP ($\tau = 0.86$)  & 81.1 & 99.7 & 15.3 & 66.5 & 25.5 & 95.3 & 97.8 \\
+SP ($\tau = 0.70$)  & 94.4 & 85.8 & 62.4 & 82.6 & 98.3 & 96.0 & 98.0 \\
+K-m.\ $T$=1000      & 97.2 & 94.1 & 53.8 & 74.6 & 98.0 & 94.6 & 98.4 \\
+DG $T$=1000         & 97.0 & 93.8 & 53.0 & 73.5 & 97.9 & 94.6 & 98.3 \\
+DG $T$=500          & 98.0 & 99.2 & 78.9 & 86.0 & 94.5 & 94.7 & 99.2 \\
+DG $T$=250          & 98.6 & 98.1 & 83.7 & 91.1 & 95.2 & 96.7 & 99.6 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Large, spectrally distinct objects achieve the best results: buildings reach 99.8\% completeness with 10.0\% contamination, and swimming pools reach 100\% completeness with 19.6\% contamination at $T = 250$. The over-segmentation of buildings into an average of 7.2 fragments is expected, as SAM2 separates roof textures, shadows, and edges into distinct segments; the merged reconstruction still aligns well with the GT boundary (BIoU = 0.49).
+Buildings and trees, which together account for 69\% of the GT area, consistently exceed 94\% ASA across all multi-pass configurations. Cars improve from 53\% at $T = 1{,}000$ to 84\% at $T = 250$, reflecting the scale-dependent detection discussed in Section~\ref{sec:res_tilesize}. Roads achieve 95--98\% ASA despite being fragmented into many segments, because each fragment's majority class is correct even when the object-level reconstruction is incomplete.
 
-Cars exhibit the highest contamination (73.4\% at $T = 250$), reflecting a resolution limitation: at 24~cm GSD, a typical car occupies approximately 8~m$^2$, and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit. Reducing tile size improves both completeness (89.3\% $\to$ 99.0\%) and contamination (86.9\% $\to$ 73.4\%), but individual car delineation remains limited at this spatial resolution.
+Table~\ref{tab:object_detection} presents the object-level evaluation for the Dense Grid $T = 250$ configuration, which achieves the highest ASA.
 
-Roads exhibit high completeness (92--95\%) but persistent contamination (87--89\%) and very low Boundary IoU (0.09), consistent with the difficulty of segmenting elongated linear features whose SAM segments inevitably include adjacent land cover.
+\begin{table}[t]
+\centering
+\caption{Object-level detection on BSB-1 (Dense Grid, $T = 250$, segment filter $> 20$\%). Det.\ = detected, Gnt.\ = giant-covered (no qualifying segment), Miss.\ = no overlapping segment.}
+\label{tab:object_detection}
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+Class & $n$ & Det. & Gnt. & Miss. & Det.\ (\%) & IoU & Recall & Ratio & $\bar{n}$ \\
+\midrule
+Buildings   & 2{,}059 & 1{,}952 & 106 &   1 & 94.8 & 0.81 & 0.94 & 1.1 & 2.9 \\
+Trees       & 5{,}443 & 5{,}206 & 237 &   0 & 95.6 & 0.94 & 0.98 & 1.0 & 1.1 \\
+Cars        & 1{,}755 & 1{,}402 & 352 &   1 & 79.9 & 0.79 & 0.95 & 1.2 & 1.0 \\
+Pools       & 1{,}157 & 1{,}006 & 151 &   0 & 86.9 & 0.72 & 0.94 & 1.4 & 1.1 \\
+Roads       &    108 &     39 &  67 &   2 & 36.1 & 0.59 & 0.73 & 1.0 & 31.0 \\
+Courts      &     53 &     53 &   0 &   0 & 100  & 0.73 & 0.94 & 1.3 & 1.3 \\
+Lakes       &      9 &      9 &   0 &   0 & 100  & 0.74 & 0.93 & 1.3 & 3.3 \\
+Decks       &     10 &      8 &   2 &   0 & 80.0 & 0.84 & 0.96 & 1.1 & 1.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Trees achieve the highest detection rate (95.6\%) and IoU (0.94), as tree canopies present strong visual contrast against surrounding surfaces and SAM2 segments them with minimal overflow (ratio 1.0$\times$). Buildings are detected at 94.8\% with IoU 0.81 and an average of 2.9 segments per building, consistent with SAM2 splitting rooftops along texture and shadow boundaries. The merged reconstruction covers 94\% of each building's area on average.
+
+Cars are detected at 79.9\%, with 20\% of cars classified as giant-covered---these are cars whose only overlapping SAM segments extend well beyond the car footprint (e.g., a segment covering an entire parking row). At 24~cm GSD, a car occupies approximately 12$\times$12~pixels, near the lower limit of SAM2's effective detection resolution. The detected cars achieve IoU 0.79 with ratio 1.2$\times$, indicating that when a car-sized segment exists, it aligns well with the GT boundary.
+
+Roads represent the most challenging class: only 36.1\% are detected as coherent objects, with 62\% classified as giant-covered. The average of 31 segments per road polygon reflects extreme fragmentation of these elongated, tile-spanning features. Despite this, per-pixel ASA for roads reaches 95.2\% (Table~\ref{tab:asa_class}), indicating that individual road segments are correctly classified even when the object-level reconstruction fails.
 
 \subsection{Scalability}
 \label{sec:res_scalability}
@@ -670,9 +695,9 @@ A notable finding is that RemoteSAMsing achieves high coverage (97.7--97.8\%) on
 
 RemoteSAMsing produces over-segmentation by design: a single building may be split into roof, shadow, and facade segments, while an agricultural field may be divided along subtle spectral gradients. This is consistent with the superpixel paradigm in Object-Based Image Analysis (OBIA), where over-segmentation is preferred over under-segmentation because segments can be merged in downstream classification but cannot be split \cite{blaschke2010obia}.
 
-Under this paradigm, a building roof divided into two segments is not an error provided neither segment leaks into adjacent objects (low class contamination) and both are correctly classifiable as ``building'' in downstream analysis.
+Under this paradigm, a building roof divided into two segments is not an error provided neither segment leaks into adjacent objects and both are correctly classifiable as ``building'' in downstream analysis.
 
-The GT-based evaluation on BSB-1 confirms this interpretation. Buildings achieve 99.8\% completeness with only 10.0\% class contamination at $T = 250$, meaning that the vast majority of building segments are spatially contained within the building footprint despite being split into an average of 7.2 fragments. Swimming pools reach 100\% completeness with 19.6\% contamination. These results indicate that RemoteSAMsing segments are suitable as input units for OBIA classification pipelines.
+The ASA metric \citep{stutz2018superpixels} provides a direct quantitative test of this suitability. On BSB-1, RemoteSAMsing achieves an ASA of 97.6\% at $T = 250$, meaning that if each segment is assigned its majority GT class, 97.6\% of all GT pixels receive the correct label. This establishes a high ceiling for any downstream OBIA classifier operating on these segments. Per-class ASA exceeds 95\% for buildings, trees, roads, and lakes, with lower values for cars (83.7\%) and swimming pools (91.1\%) reflecting the difficulty of delineating small objects at 24~cm resolution. The object-level evaluation confirms that buildings are detected at 94.8\% with a mean IoU of 0.81 despite being split into an average of 2.9 fragments, and trees achieve 95.6\% detection with IoU of 0.94. These results indicate that RemoteSAMsing segments are suitable as input units for OBIA classification pipelines.
 
 Compared to traditional superpixel methods such as SLIC \cite{achanta2012slic}, RemoteSAMsing offers a key advantage: the segments are generated by a foundation model trained on over one billion natural image masks, giving them semantic awareness that purely spectral/spatial methods lack. SAM2 tends to produce boundaries that align with semantically meaningful edges (e.g., object contours) rather than arbitrary spectral gradients, potentially improving downstream classification performance.
 
@@ -685,7 +710,9 @@ Several limitations warrant discussion.
 
 \textit{No semantic output.} RemoteSAMsing produces instance-agnostic segments without class labels. Downstream classification (e.g., random forest on segment-level features) is required to produce thematic maps. This is inherent to SAM2's design as a class-agnostic segmentation model.
 
-\textit{Small object delineation.} While completeness for cars reaches 99\% at $T = 250$, class contamination remains high (73\%) because adjacent cars or cars with surrounding pavement are frequently merged into a single segment. At 24~cm GSD, a typical car occupies only $\sim$8~m$^2$, and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit. Higher-resolution imagery (e.g., 5~cm GSD) is expected to reduce this effect, as inter-vehicle gaps become more visible. Similarly, elongated linear features (roads) exhibit persistent boundary contamination regardless of tile size.
+\textit{Small object delineation.} Cars achieve 79.9\% object detection at $T = 250$, with the remaining 20\% covered exclusively by segments whose area exceeds five times the car footprint---segments that encompass the car along with surrounding pavement rather than delineating it individually. At 24~cm GSD, a typical car occupies approximately 12$\times$12~pixels ($\sim$8~m$^2$), and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit. Higher-resolution imagery (e.g., 5~cm GSD, where the same car spans $\sim$50$\times$50~pixels) is expected to improve individual car delineation substantially.
+
+\textit{Linear features.} Roads represent the most difficult object class, with only 36.1\% object detection despite high per-pixel ASA (95.2\%). This apparent contradiction arises because road segments are numerous (an average of 31 segments per road polygon) and individually small, so each segment's majority class is often correct, but the fragmented reconstruction fails the object-level detection criterion. Elongated, connected structures that span multiple tiles remain fundamentally challenging for a tile-based approach.
 
 \textit{Processing time.} Although time scales linearly with tile count, the absolute processing time remains substantial for very large images: approximately 14 hours for 1{,}600 tiles at $T = 250$. GPU utilization per tile is dominated by SAM2 inference, with limited opportunity for parallelism within the current tile-sequential architecture.
 
