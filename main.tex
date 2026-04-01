@@ -508,6 +508,15 @@ Plant23 & \textbf{99.06} & 98.74 & 97.78 & 14{,}111 & 4{,}404 & 1{,}664 & 1{,}60
 
 Reducing tile size from 1{,}000 to 250 increases coverage by +6.52~pp (BSB-1), +2.44~pp (Potsdam-1), and +1.28~pp (Plant23). Processing time increases by $8.8\times$ to $9.7\times$ for the $16\times$ increase in tile count.
 
+Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection in BSB-1. At $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas (severe under-segmentation, ratio $> 10\times$). At $T = 500$, the majority of cars are individually delineated (ratio $< 3\times$), with residual under-segmentation in dense parking rows. At $T = 250$, 91\% of the 259 cars in this crop are correctly detected with segment-to-object ratios below $3\times$.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig4_tilesize.png}
+    \caption{Effect of tile size on small object detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car evaluation. Green: correctly delineated (segment-to-car ratio $< 3\times$). Yellow: mild under-segmentation ($3$--$10\times$). Red: severe under-segmentation ($> 10\times$). Gray: missed (no overlapping segment).}
+    \label{fig:tilesize_cars}
+\end{figure}
+
 \subsection{Boundary Merge Evaluation}
 \label{sec:res_boundary}
 
