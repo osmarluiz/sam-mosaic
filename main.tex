@@ -552,6 +552,15 @@ Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 \\
 \end{tabular}
 \end{table}
 
+Fig.~\ref{fig:padding} illustrates the complementary role of contextual padding. Without padding, SAM2 processes each tile without visibility beyond its borders, producing segments that terminate abruptly at tile edges. Even the best-match merge cannot unify these segments because the underlying segmentation does not align across the boundary. With padding, SAM2 sees context beyond the tile edge, producing segments that extend naturally across boundaries and enabling the merge algorithm to unify them into spatially coherent objects.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig6_padding.png}
+    \caption{Effect of contextual padding on boundary segmentation. Colored segments are affected by the tile boundary (red dashed line); gray segments are unaffected. Without padding, segments terminate at the boundary, creating visible discontinuities. With padding, the same objects are segmented continuously across tile edges.}
+    \label{fig:padding}
+\end{figure}
+
 Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on BSB-1, evaluated against 11{,}645 manually digitized GT polygons covering 52.8\% of the image area across eight land cover classes.
 
 \begin{table}[t]
