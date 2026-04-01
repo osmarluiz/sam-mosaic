@@ -638,19 +638,14 @@ The average time per tile ranges from 22 to 64~s across scenes. GPU memory usage
 \subsection{Qualitative Analysis}
 \label{sec:res_qualitative}
 
-\todo{Visual results for each scene. Show:
-(a) Original RGB image with segmentation overlay (random colors)
-(b) Zoom-in panels showing boundary quality, small object detection
-(c) Side-by-side K-means vs Dense Grid on a BSB crop
-(d) Multi-pass sequence on an example tile
-(e) Boundary merge before/after on tile edges}
+Fig.~\ref{fig:full_segmentation} presents the full segmentation output for all three datasets, demonstrating that RemoteSAMsing produces spatially consistent, artifact-free results across different sensors, resolutions, and spectral compositions without any model retraining. The BSB-1 scene (8000$\times$8000 pixels, 24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage using the Dense Grid strategy at $T = 250$. Zoom panels A1--A3 reveal that individual buildings, tree canopies, swimming pools, and vehicles are delineated as distinct segments with boundaries that follow real object contours. The Potsdam-1 scene (6000$\times$6000 pixels, 5~cm GSD) achieves 97.1\% coverage with 2{,}388 segments at $T = 1{,}000$, with the higher spatial resolution producing fewer, larger segments per object. The Plant23 scene (10{,}000$\times$10{,}000 pixels, 4.78~m GSD, MNF false-color) reaches 99.4\% coverage with 3{,}530 segments at $T = 250$, confirming that RemoteSAMsing generalizes to non-natural RGB compositions derived from multispectral data.
 
-% \begin{figure}[t]
-%     \centering
-%     \includegraphics[width=\textwidth]{figures/qualitative_results.pdf}
-%     \caption{Qualitative segmentation results across all datasets.}
-%     \label{fig:qualitative}
-% \end{figure}
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig2_full_segmentation.png}
+    \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 250$, 3{,}530 segments, 99.4\% coverage). Segment colors are assigned randomly for visualization.}
+    \label{fig:full_segmentation}
+\end{figure}
 
 
 % ============================================================================
