@@ -133,7 +133,7 @@ For pixel-level segmentation of large RS images, where the number of segments ca
 
 This section describes the RemoteSAMsing pipeline in three parts: Section~\ref{sec:method_scaling} addresses the challenge of scaling SAM2 to images larger than GPU memory through tiling, boundary merging, and post-processing; Section~\ref{sec:method_multipass} presents the multi-pass adaptive segmentation algorithm that maximizes coverage within each tile; and Section~\ref{sec:method_points} introduces the scene-dependent point sampling strategies. Fig.~\ref{fig:pipeline} provides an overview of the complete pipeline.
 
-% \begin{figure}[t]
+% \begin{figure}[h!]
 %     \centering
 %     \includegraphics[width=\textwidth]{figures/pipeline_overview.pdf}
 %     \caption{Overview of the RemoteSAMsing pipeline. A large remote sensing image is divided into tiles with contextual padding. Each tile undergoes multi-pass adaptive segmentation using SAM2, where covered regions are progressively masked and thresholds are relaxed to capture increasingly difficult areas. After all tiles are processed, a boundary merge algorithm based on Union-Find unifies segments across tile edges, followed by post-processing to absorb enclosed fragments and remove noise. The output is a seamless labeled raster and vectorized polygons.}
@@ -251,7 +251,7 @@ Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms 
 
 \textbf{Mask acceptance criteria.} Each mask returned by SAM2 may contain multiple disconnected regions (e.g., when SAM2 groups visually similar but spatially separate areas). The algorithm splits every mask into its 4-connected components and evaluates each component independently against two criteria: (1)~\textit{minimum area}: components smaller than $a_{\min}$ pixels (default 100) are discarded as noise; and (2)~\textit{overlap ratio}: if 50\% or more of the component's pixels are already covered by existing segments, the component is considered redundant and rejected. The 50\% majority threshold balances accepting masks that extend into new territory against rejecting masks that largely duplicate existing segments. Components passing both criteria are assigned a unique label and added to the coverage mask. This per-component evaluation prevents a single large SAM2 mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
 
-% \begin{figure}[t]
+% \begin{figure}[h!]
 %     \centering
 %     \includegraphics[width=\textwidth]{figures/multipass_sequence.pdf}
 %     \caption{Multi-pass segmentation sequence on an example tile. (a)~Original image. (b)~After pass~0: high-confidence segments captured at $\tau_{\text{iou}} = 0.93$. (c)~Black mask applied: covered regions set to black. (d)~After pass~3: additional segments captured at lower thresholds. (e)~Final result after all passes. The coverage increases from 45\% after pass~0 to 97\% after convergence.}
@@ -281,7 +281,7 @@ The Dense Grid strategy maintains a fixed uniform grid across all passes, relyin
 
 Unlike K-means, which always produces exactly $k$ centroids regardless of how much area remains, the Dense Grid maintains uniform point density across all unsegmented regions but its effective point count decreases as coverage grows: at 95\% coverage, only approximately 5\% of the original $k^2$ grid points survive filtering. This property benefits urban scenes containing many small, scattered objects (e.g., cars, narrow pathways, small roof sections) that may be individually too small to attract a K-means centroid but are numerous enough to collectively represent significant unsegmented area. Section~\ref{sec:res_strategy} compares both strategies across scene types.
 
-% \begin{figure}[t]
+% \begin{figure}[h!]
 %     \centering
 %     \begin{subfigure}[t]{0.48\textwidth}
 %         \includegraphics[width=\textwidth]{figures/points_kmeans.pdf}
@@ -328,7 +328,7 @@ Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
 
 \textbf{Plant23.} A single crop of $10{,}000 \times 10{,}000$ pixels from a Planet satellite image over an agricultural region in central Brazil. The image uses a false-color composition derived from Minimum Noise Fraction (MNF) transformation of the original multispectral bands, with the three highest signal-to-noise components mapped to RGB. At approximately 4.78~m ground sampling distance, the dominant features are large, spectrally homogeneous agricultural fields (soybean, corn, cotton) interspersed with natural vegetation corridors. This dataset evaluates performance on non-natural RGB compositions that SAM2 was never trained on, as well as on scenes dominated by large objects rather than the small, dense features of urban imagery.
 
-% \begin{figure}[t]
+% \begin{figure}[h!]
 %     \centering
 %     \includegraphics[width=\textwidth]{figures/study_areas.pdf}
 %     \caption{Study areas and example imagery. (a)~ISPRS Potsdam: dense European urban, true-color RGB at 5~cm. (b)~Bras\'{i}lia: Brazilian urban, true-color RGB at 24~cm. (c)~Plant23: agricultural, MNF false-color at 4.78~m. Note the different object scales: individual cars are visible in Potsdam and Bras\'{i}lia, while Plant23 features span hundreds of pixels.}
@@ -510,7 +510,7 @@ Reducing tile size from 1{,}000 to 250 increases coverage by +6.52~pp (BSB-1), +
 
 Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection in BSB-1. At $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas (severe under-segmentation, ratio $> 10\times$). At $T = 500$, the majority of cars are individually delineated (ratio $< 3\times$), with residual under-segmentation in dense parking rows. At $T = 250$, 91\% of the 259 cars in this crop are correctly detected with segment-to-object ratios below $3\times$.
 
-\begin{figure}[t]
+\begin{figure}[h!]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig4_tilesize.png}
     \caption{Effect of tile size on small object detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car evaluation. Green: correctly delineated (segment-to-car ratio $< 3\times$). Yellow: mild under-segmentation ($3$--$10\times$). Red: severe under-segmentation ($> 10\times$). Gray: missed (no overlapping segment).}
@@ -522,7 +522,7 @@ Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection i
 
 Fig.~\ref{fig:merge} illustrates the effect of the merge strategy on three datasets. The naive baseline merges any pair of segments sharing at least one pixel of contact across a tile boundary, propagating merges transitively through Union-Find. This aggressive strategy joins unrelated segments: in the BSB-1 example, multiple buildings and vegetation areas are fused into a single segment spanning the tile corner. In the Potsdam-1 example, the naive merge creates a mega-segment covering 83\% of the crop. The best-match strategy avoids these spurious merges by requiring each segment to commit to exactly one partner, the neighbor with the highest contact area. Coverage is identical under both strategies; only segment count and merge quality differ.
 
-\begin{figure}[t]
+\begin{figure}[h!]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig5_merge.png}
     \caption{Boundary merge comparison across three datasets. Each row shows a crop centered on a tile boundary (red dashed lines). Before merge: independent per-tile segments with different labels on each side. Naive merge: all touching segments are merged transitively, creating spurious mega-segments that span unrelated objects. Best-match merge: each segment merges only with its highest-contact neighbor, preserving object identity across tile boundaries.}
@@ -554,7 +554,7 @@ Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 \\
 
 Fig.~\ref{fig:padding} illustrates the complementary role of contextual padding. Without padding, SAM2 processes each tile without visibility beyond its borders, producing segments that terminate abruptly at tile edges. Even the best-match merge cannot unify these segments because the underlying segmentation does not align across the boundary. With padding, SAM2 sees context beyond the tile edge, producing segments that extend naturally across boundaries and enabling the merge algorithm to unify them into spatially coherent objects.
 
-\begin{figure}[t]
+\begin{figure}[h!]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig6_padding.png}
     \caption{Effect of contextual padding on boundary segmentation. Colored segments are affected by the tile boundary (red dashed line); gray segments are unaffected. Without padding, segments terminate at the boundary, creating visible discontinuities. With padding, the same objects are segmented continuously across tile edges.}
@@ -667,7 +667,7 @@ The average time per tile ranges from 22 to 64~s across scenes. GPU memory usage
 
 Fig.~\ref{fig:full_segmentation} presents the full segmentation output for all three datasets, demonstrating that RemoteSAMsing produces spatially consistent, artifact-free results across different sensors, resolutions, and spectral compositions without any model retraining. The BSB-1 scene (8000$\times$8000 pixels, 24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage using the Dense Grid strategy at $T = 250$. Zoom panels A1--A3 reveal that individual buildings, tree canopies, swimming pools, and vehicles are delineated as distinct segments with boundaries that follow real object contours. The Potsdam-1 scene (6000$\times$6000 pixels, 5~cm GSD) achieves 97.1\% coverage with 2{,}388 segments at $T = 1{,}000$, with the higher spatial resolution producing fewer, larger segments per object. The Plant23 scene (10{,}000$\times$10{,}000 pixels, 4.78~m GSD, MNF false-color) reaches 99.4\% coverage with 3{,}530 segments at $T = 250$, confirming that RemoteSAMsing generalizes to non-natural RGB compositions derived from multispectral data.
 
-\begin{figure}[p]
+\begin{figure}[h!]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig2_full_segmentation.png}
     \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 250$, 3{,}530 segments, 99.4\% coverage). Segment colors are assigned randomly for visualization.}
