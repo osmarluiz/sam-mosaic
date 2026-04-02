@@ -43,7 +43,7 @@
 \address[geo]{Department of Geography, University of Bras\'{i}lia, Bras\'{i}lia, Brazil}
 
 \begin{abstract}
-The Segment Anything Model 2 (SAM2) has demonstrated strong zero-shot segmentation capabilities, yet its application to remote sensing (RS) imagery remains constrained by GPU memory limitations that restrict input to small image patches. This paper presents RemoteSAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large RS images through three contributions: (1) a multi-pass segmentation strategy with black mask focusing and adaptive threshold decay that progressively captures increasingly difficult image regions; (2) scene-dependent point sampling strategies, K-means clustering for large homogeneous objects and dense grid placement for small scattered features, that adapt SAM2's automatic mask generation to different RS scenarios; and (3) an efficient $O(n)$ boundary merge algorithm based on lookup tables and Union-Find that eliminates tile boundary artifacts. The evaluation covers seven scenes spanning three sensors (aerial at 5~cm, aerial at 24~cm, and satellite at 4.78~m), two RGB compositions (natural and MNF false-color), and two landscape types (urban and agricultural). Component ablation demonstrates that the full pipeline achieves 89--98\% coverage compared to 30--68\% for vanilla SAM2 single-pass inference. The K-means strategy performs comparably to dense grid on agricultural scenes with large objects, while dense grid provides 1--3 percentage points higher coverage on urban scenes with many small features. Tile size analysis reveals a coverage--speed tradeoff, with smaller tiles (250$\times$250) achieving up to 99\% coverage at the cost of increased processing time. Boundary quality is assessed using standard superpixel metrics (Boundary Recall, Undersegmentation Error, Achievable Segmentation Accuracy) on the ISPRS Potsdam dataset. \todo{Add boundary metric results.} RemoteSAMsing provides a practical, sensor-agnostic solution for applying foundation model capabilities to large-scale RS image analysis.
+The Segment Anything Model 2 (SAM2) has demonstrated strong zero-shot segmentation capabilities, yet its application to remote sensing (RS) imagery remains constrained by GPU memory limitations that restrict input to small image patches. This paper presents RemoteSAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large RS images through three contributions: (1) a multi-pass segmentation strategy with black mask focusing and adaptive threshold decay that progressively captures increasingly difficult image regions; (2) scene-dependent point sampling strategies, K-means clustering for large homogeneous objects and dense grid placement for small scattered features, that adapt SAM2's automatic mask generation to different RS scenarios; and (3) an efficient $O(n)$ boundary merge algorithm based on lookup tables and Union-Find that eliminates tile boundary artifacts. The evaluation covers seven scenes spanning three sensors (aerial at 5~cm, aerial at 24~cm, and satellite at 4.78~m), two RGB compositions (natural and MNF false-color), and two landscape types (urban and agricultural). Component ablation demonstrates that the full pipeline achieves 89--98\% coverage compared to 30--68\% for vanilla SAM2 single-pass inference. The K-means strategy performs comparably to dense grid on agricultural scenes with large objects, while dense grid provides 1--3 percentage points higher coverage on urban scenes with many small features. Tile size analysis reveals a coverage--speed tradeoff, with smaller tiles (250$\times$250) achieving up to 99\% coverage at the cost of increased processing time. Achievable Segmentation Accuracy (ASA) reaches 90\% on BSB-1 (24~cm) and 76\% on Potsdam-1 (5~cm). Object-level evaluation confirms building detection at 95--96\% (IoU 0.82--0.88), car detection at 81--97\% depending on spatial resolution, and tree detection up to 96\% (IoU 0.94). RemoteSAMsing provides a practical, sensor-agnostic solution for applying foundation model segmentation to large-scale RS image analysis.
 \end{abstract}
 
 \begin{keyword}
@@ -183,7 +183,7 @@ RemoteSAMsing maximizes coverage within each tile through a multi-pass segmentat
 
 Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms work together within the loop: \textit{black mask focusing}, which directs SAM2's attention to unsegmented regions; \textit{adaptive threshold decay}, which progressively relaxes quality filters; and \textit{per-component mask acceptance}, which filters redundant and noisy outputs. Each is described below.
 
-\begin{algorithm}[h!]
+\begin{algorithm}[p]
 \caption{Multi-pass adaptive segmentation (per tile)}
 \label{alg:multipass}
 \begin{algorithmic}[1]
@@ -404,7 +404,7 @@ The tile size $T$ controls a fundamental tradeoff: smaller tiles increase the nu
 
 \subsubsection{Experiment~4: Segmentation quality assessment}
 
-To evaluate whether the generated segments correspond to real-world objects, each scene with available ground truth (GT) is evaluated against manually digitized polygons with land cover class labels. The BSB-1 scene contains 11{,}645~GT polygons across eight classes (buildings, trees, cars, swimming pools, roads, sports courts, decks, and lakes). \todo{Add Potsdam and Plant23 GT descriptions when available.}
+To evaluate whether the generated segments correspond to real-world objects, each scene with available ground truth (GT) is evaluated against manually digitized polygons with land cover class labels. The BSB-1 scene is evaluated against 10{,}849 manually digitized GT polygons across eight classes (buildings, trees, cars, swimming pools, roads, sports courts, decks, and lakes); unannotated background (42\% of the image) is treated as a separate class for ASA computation. The Potsdam-1 scene uses the publicly available ISPRS semantic labels (six classes: impervious surfaces, buildings, low vegetation, trees, cars, and clutter), from which 1{,}721 object instances are extracted as connected components. \todo{Add Plant23 GT description when available.}
 
 The evaluation follows two complementary protocols. First, \textit{Achievable Segmentation Accuracy} (ASA) \citep{stutz2018superpixels} quantifies global superpixel quality: each SAM segment is assigned the majority GT class label among its pixels, and ASA is the fraction of GT-covered pixels that receive the correct label. This standard superpixel benchmark metric directly answers whether the segments are suitable as input units for OBIA classification. ASA is computed over the GT-covered area only.
 
@@ -431,6 +431,13 @@ The object-level protocol produces four metrics. \textbf{Detection rate} (\%) is
 % ============================================================================
 
 Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets, providing a visual overview of the results quantified in the following subsections.
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig2_full_segmentation.png}
+    \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 250$, 3{,}530 segments, 99.4\% coverage). Segment colors are assigned randomly for visualization.}
+    \label{fig:full_segmentation}
+\end{figure}
 
 \subsection{Component Ablation}
 \label{sec:res_ablation}
@@ -659,14 +666,6 @@ The average time per tile ranges from 22 to 64~s across scenes. GPU memory usage
 \label{sec:res_qualitative}
 
 Fig.~\ref{fig:full_segmentation} presents the full segmentation output for all three datasets, demonstrating that RemoteSAMsing produces spatially consistent, artifact-free results across different sensors, resolutions, and spectral compositions without any model retraining. The BSB-1 scene (8000$\times$8000 pixels, 24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage using the Dense Grid strategy at $T = 250$. Zoom panels A1--A3 reveal that individual buildings, tree canopies, swimming pools, and vehicles are delineated as distinct segments with boundaries that follow real object contours. The Potsdam-1 scene (6000$\times$6000 pixels, 5~cm GSD) achieves 97.1\% coverage with 2{,}388 segments at $T = 1{,}000$, with the higher spatial resolution producing fewer, larger segments per object. The Plant23 scene (10{,}000$\times$10{,}000 pixels, 4.78~m GSD, MNF false-color) reaches 99.4\% coverage with 3{,}530 segments at $T = 250$, confirming that RemoteSAMsing generalizes to non-natural RGB compositions derived from multispectral data.
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.97\textwidth]{figures/fig2_full_segmentation.png}
-    \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 250$, 3{,}530 segments, 99.4\% coverage). Segment colors are assigned randomly for visualization.}
-    \label{fig:full_segmentation}
-\end{figure}
-
 
 % ============================================================================
 \section{Discussion}
