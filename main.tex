@@ -183,64 +183,34 @@ RemoteSAMsing maximizes coverage within each tile through a multi-pass segmentat
 
 Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms work together within the loop: \textit{black mask focusing}, which directs SAM2's attention to unsegmented regions; \textit{adaptive threshold decay}, which progressively relaxes quality filters; and \textit{per-component mask acceptance}, which filters redundant and noisy outputs. Each is described below.
 
-\begin{algorithm}[p]
+\begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
 \label{alg:multipass}
+\small
 \begin{algorithmic}[1]
-\REQUIRE Image $I$ of size $W \times H$; configuration $\mathcal{C}$
-\ENSURE Label map $L$ of size $W \times H$
-
-\STATE $L \leftarrow \mathbf{0}_{W \times H}$; \quad $M \leftarrow \mathbf{0}_{W \times H}$ \COMMENT{labels and coverage mask}
-\STATE $\tau_{\text{iou}} \leftarrow \tau_{\text{iou}}^{\text{start}}$; \quad $\tau_{\text{stab}} \leftarrow \tau_{\text{stab}}^{\text{start}}$ \COMMENT{initial thresholds}
-\STATE $P \leftarrow \textsc{UniformGrid}(W, H, k)$ \COMMENT{$k \times k$ regular grid}
-\STATE $\ell \leftarrow 1$; \quad $\text{cov}_{\text{prev}} \leftarrow 0$ \COMMENT{next available label; previous coverage}
-
+\REQUIRE Image $I$ ($W \times H$); config $\mathcal{C}$ with $\tau^{\text{start}}, \tau^{\text{end}}, \Delta, k, a_{\min}, t_{\max}, \text{cov}_{\text{target}}$
+\ENSURE Label map $L$ ($W \times H$)
+\STATE $L, M \leftarrow \mathbf{0}_{W \times H}$; \; $\tau \leftarrow \tau^{\text{start}}$; \; $\ell \leftarrow 1$; \; $\text{cov}_{\text{prev}} \leftarrow 0$
 \FOR{$t = 0, 1, \ldots, t_{\max}$}
-
     \IF{$t > 0$}
-        \STATE $I' \leftarrow \textsc{BlackMask}(I, M)$ \COMMENT{set covered pixels to $(0,0,0)$}
-        \STATE $P \leftarrow \textsc{SamplePoints}(M, \mathcal{C}.\text{strategy})$ \COMMENT{K-means or Dense Grid}
+        \STATE $I' \leftarrow \textsc{BlackMask}(I, M)$; \; $P \leftarrow \textsc{SamplePoints}(M, \mathcal{C})$ \COMMENT{K-means or Dense Grid}
     \ELSE
-        \STATE $I' \leftarrow I$
+        \STATE $I' \leftarrow I$; \; $P \leftarrow \textsc{UniformGrid}(W, H, k)$
     \ENDIF
-
-    \IF{$|P| = 0$}
-        \STATE \textbf{break} \COMMENT{no valid points remain}
-    \ENDIF
-
-    \STATE $\mathcal{M} \leftarrow \textsc{SAM2\_AMG}(I', P, \tau_{\text{iou}}, \tau_{\text{stab}})$ \COMMENT{generate masks}
-    \STATE $n_{\text{added}} \leftarrow 0$
-
-    \FORALL{mask $m \in \mathcal{M}$}
-        \FORALL{connected component $c$ of $m$}
-            \IF{$\text{area}(c) < a_{\min}$}
-                \STATE \textbf{continue} \COMMENT{too small}
-            \ENDIF
-            \IF{$|c \cap M| \;/\; |c| \geq 0.5$}
-                \STATE \textbf{continue} \COMMENT{$\geq$50\% already covered}
-            \ENDIF
-            \STATE $L[c] \leftarrow \ell$; \quad $M[c] \leftarrow 1$; \quad $\ell \leftarrow \ell + 1$; \quad $n_{\text{added}} \leftarrow n_{\text{added}} + 1$
-        \ENDFOR
+    \IF{$|P| = 0$} \textbf{break} \ENDIF
+    \STATE $\mathcal{M} \leftarrow \textsc{SAM2\_AMG}(I', P, \tau)$; \; $n_{\text{added}} \leftarrow 0$
+    \FORALL{connected component $c$ in each mask $m \in \mathcal{M}$}
+        \IF{$\text{area}(c) < a_{\min}$ \textbf{or} $|c \cap M| / |c| \geq 0.5$} \textbf{continue} \ENDIF
+        \STATE $L[c] \leftarrow \ell$; \; $M[c] \leftarrow 1$; \; $\ell \leftarrow \ell + 1$; \; $n_{\text{added}} \leftarrow n_{\text{added}} + 1$
     \ENDFOR
-
-    \STATE $\text{cov} \leftarrow \sum M \;/\; (W \cdot H) \times 100$
-
-    \IF{$\text{cov} \geq \text{cov}_{\text{target}}$}
-        \STATE \textbf{break}
+    \STATE $\text{cov} \leftarrow \sum M / (W \cdot H) \times 100$
+    \IF{$\text{cov} \geq \text{cov}_{\text{target}}$} \textbf{break} \ENDIF
+    \IF{$n_{\text{added}} = 0$ \textbf{or} $\text{cov} - \text{cov}_{\text{prev}} < 0.1$} \COMMENT{stagnation}
+        \IF{$\tau \leq \tau^{\text{end}}$} \textbf{break} \ENDIF \COMMENT{thresholds exhausted}
+        \STATE $\tau \leftarrow \max(\tau - \Delta, \; \tau^{\text{end}})$ \COMMENT{decay both $\tau_{\text{iou}}$ and $\tau_{\text{stab}}$}
     \ENDIF
-
-    \IF{$n_{\text{added}} = 0$ \textbf{or} $\text{cov} - \text{cov}_{\text{prev}} < 0.1$}
-        \IF{$\tau_{\text{iou}} \leq \tau_{\text{iou}}^{\text{end}}$}
-            \STATE \textbf{break} \COMMENT{thresholds exhausted}
-        \ENDIF
-        \STATE $\tau_{\text{iou}} \leftarrow \max(\tau_{\text{iou}} - \Delta, \; \tau_{\text{iou}}^{\text{end}})$
-        \STATE $\tau_{\text{stab}} \leftarrow \max(\tau_{\text{stab}} - \Delta, \; \tau_{\text{stab}}^{\text{end}})$
-    \ENDIF
-
     \STATE $\text{cov}_{\text{prev}} \leftarrow \text{cov}$
-
 \ENDFOR
-
 \RETURN $L$
 \end{algorithmic}
 \end{algorithm}
