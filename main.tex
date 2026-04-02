@@ -456,6 +456,8 @@ No padding & 89.75 & 96.83 & 97.21 & $-$0.6 \\
 
 The full pipeline achieves the highest coverage across all scenes, ranging from 89.02\% on BSB-1 to 97.72\% on Potsdam-1. Single-pass SAM2 at the highest quality threshold ($\tau_{\text{iou}} = 0.93$) captures only 30--68\% of the image. Even at the lowest threshold tested ($\tau_{\text{iou}} = 0.70$), single-pass coverage reaches only 77--93\%. Removing the black mask from the multi-pass loop reduces coverage by 8.6~pp on average, while fixing the threshold instead of using adaptive decay reduces coverage by 13.9~pp. Removing padding has the smallest effect ($-$0.6~pp on average), with BSB-1 actually achieving slightly higher coverage without padding (89.75\% vs.\ 89.02\%).
 
+Section~\ref{sec:res_quality} quantifies how these coverage differences translate to object-level detection: on BSB-1, increasing coverage from 30\% (single-pass, $\tau = 0.93$) to 98\% (Dense Grid, $T = 250$) raises car detection from 0.4\% to 81.3\% and tree detection from 23.5\% to 95.7\%.
+
 \subsection{Point Sampling Strategy Comparison}
 \label{sec:res_strategy}
 
@@ -507,6 +509,8 @@ Plant23 & \textbf{99.06} & 98.74 & 97.78 & 14{,}111 & 4{,}404 & 1{,}664 & 1{,}60
 \end{table}
 
 Reducing tile size from 1{,}000 to 250 increases coverage by +6.52~pp (BSB-1), +2.44~pp (Potsdam-1), and +1.28~pp (Plant23). Processing time increases by $8.8\times$ to $9.7\times$ for the $16\times$ increase in tile count.
+
+On Potsdam-1, reducing tile size below $T = 1{,}000$ degrades segmentation quality. At $T = 250$, the largest merged segment covers 70.4\% of the image (25.3 million of 36 million pixels), and ASA (Section~\ref{sec:res_quality}) drops from 75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$. At 5~cm GSD, a $250 \times 250$ pixel tile covers $12.5 \times 12.5$~m on the ground.
 
 Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection in BSB-1. At $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas (severe under-segmentation, ratio $> 10\times$). At $T = 500$, the majority of cars are individually delineated (ratio $< 3\times$), with residual under-segmentation in dense parking rows. At $T = 250$, 91\% of the 259 cars in this crop are correctly detected with segment-to-object ratios below $3\times$.
 
@@ -561,80 +565,67 @@ Fig.~\ref{fig:padding} illustrates the complementary role of contextual padding.
     \label{fig:padding}
 \end{figure}
 
-Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on BSB-1, evaluated against 11{,}645 manually digitized GT polygons covering 52.8\% of the image area across eight land cover classes.
+Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on two datasets. For BSB-1, unannotated background (42\% of the image) is treated as a separate class to ensure that all pixels contribute to the metric, matching the exhaustive labeling of the ISPRS Potsdam dataset. For Potsdam-1, object instances are extracted as connected components from the ISPRS semantic labels.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
-\caption{Achievable Segmentation Accuracy (ASA) on BSB-1. ASA is computed over GT-covered pixels only. Cov.\ = fraction of GT area covered by SAM segments.}
+\caption{Achievable Segmentation Accuracy (ASA, \%) across datasets and configurations. BSB-1 includes unannotated background as a separate class for comparability with Potsdam-1, where ISPRS labels cover 100\% of pixels. Best result per dataset in bold.}
 \label{tab:asa_global}
 \begin{tabular}{lrr}
 \toprule
-Configuration & ASA (\%) & Cov.\ (\%) \\
+Configuration & BSB-1 (24~cm) & Potsdam-1 (5~cm) \\
 \midrule
-Single pass ($\tau = 0.93$) & 65.7 & 41.5 \\
-Single pass ($\tau = 0.86$) & 79.1 & 67.1 \\
-Single pass ($\tau = 0.70$) & 91.8 & 87.0 \\
-K-means ($T = 1{,}000$)     & 95.4 & 95.3 \\
-Dense Grid ($T = 1{,}000$)  & 95.2 & 95.3 \\
-Dense Grid ($T = 500$)      & 97.5 & 98.3 \\
-Dense Grid ($T = 250$)      & 97.6 & 98.8 \\
+Single pass ($\tau = 0.93$) & 67.0 & 53.8 \\
+Single pass ($\tau = 0.86$) & 78.3 & 68.0 \\
+Single pass ($\tau = 0.70$) & 86.9 & 79.6 \\
+Dense Grid ($T = 1{,}000$)  & 86.2 & \textbf{75.8} \\
+Dense Grid ($T = 500$)      & \textbf{90.1} & 60.4$^*$ \\
+Dense Grid ($T = 250$)      & 88.1 & 46.0$^*$ \\
 \bottomrule
+\multicolumn{3}{l}{\footnotesize $^*$Degraded by merge chaining at 5~cm GSD (Section~\ref{sec:res_tilesize}).}
 \end{tabular}
 \end{table}
 
-Single-pass SAM2 at the strictest threshold ($\tau = 0.93$) achieves only 65.7\% ASA because large portions of the image remain unsegmented. The multi-pass pipeline raises ASA to 95.2--95.4\% at $T = 1{,}000$, with marginal further gains at smaller tile sizes (97.6\% at $T = 250$). The high ASA indicates that the vast majority of SAM2 segment boundaries align with real land cover boundaries rather than crossing them.
+Single-pass SAM2 achieves 53.8--67.0\% ASA depending on threshold and dataset. The full RemoteSAMsing pipeline raises ASA to 86.2\% on BSB-1 and 75.8\% on Potsdam-1 at $T = 1{,}000$. On BSB-1, ASA peaks at 90.1\% with $T = 500$ and decreases to 88.1\% at $T = 250$. On Potsdam-1, tile sizes below $T = 1{,}000$ degrade ASA due to merge chaining (Section~\ref{sec:res_tilesize}).
 
-Table~\ref{tab:asa_class} shows per-class ASA, revealing that the global value masks substantial variation across object types.
+Table~\ref{tab:object_detection} presents the object-level evaluation for both datasets using the best configuration for each: Dense Grid $T = 250$ for BSB-1 (10{,}849 manually digitized GT polygons across eight classes) and Dense Grid $T = 1{,}000$ for Potsdam-1 (1{,}721 instances extracted from ISPRS semantic labels across six classes).
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
-\caption{Per-class ASA (\%) on BSB-1. Pixel counts reflect the relative contribution of each class to the GT area (total: 33.8M~pixels).}
-\label{tab:asa_class}
-\begin{tabular}{lrrrrrrr}
-\toprule
-Config & Build. & Trees & Cars & Pools & Roads & Courts & Lakes \\
-       & (33\%) & (36\%) & (1\%) & (2\%) & (17\%) & (1\%) & (10\%) \\
-\midrule
-SP ($\tau = 0.93$)  & 54.7 & 99.9 &  1.2 & 22.9 &  5.4 & 89.0 & 97.6 \\
-SP ($\tau = 0.86$)  & 81.1 & 99.7 & 15.3 & 66.5 & 25.5 & 95.3 & 97.8 \\
-SP ($\tau = 0.70$)  & 94.4 & 85.8 & 62.4 & 82.6 & 98.3 & 96.0 & 98.0 \\
-K-m.\ $T$=1000      & 97.2 & 94.1 & 53.8 & 74.6 & 98.0 & 94.6 & 98.4 \\
-DG $T$=1000         & 97.0 & 93.8 & 53.0 & 73.5 & 97.9 & 94.6 & 98.3 \\
-DG $T$=500          & 98.0 & 99.2 & 78.9 & 86.0 & 94.5 & 94.7 & 99.2 \\
-DG $T$=250          & 98.6 & 98.1 & 83.7 & 91.1 & 95.2 & 96.7 & 99.6 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Buildings and trees, which together account for 69\% of the GT area, consistently exceed 94\% ASA across all multi-pass configurations. Cars improve from 53\% at $T = 1{,}000$ to 84\% at $T = 250$, reflecting the scale-dependent detection discussed in Section~\ref{sec:res_tilesize}. Roads achieve 95--98\% ASA despite being fragmented into many segments, because each fragment's majority class is correct even when the object-level reconstruction is incomplete.
-
-Table~\ref{tab:object_detection} presents the object-level evaluation for the Dense Grid $T = 250$ configuration, which achieves the highest ASA.
-
-\begin{table}[t]
-\centering
-\caption{Object-level detection on BSB-1 (Dense Grid, $T = 250$, segment filter $> 20$\%). Det.\ = detected, Gnt.\ = giant-covered (no qualifying segment), Miss.\ = no overlapping segment.}
+\caption{Object-level detection across datasets. BSB-1: Dense Grid $T = 250$, 24~cm GSD. Potsdam-1: Dense Grid $T = 1{,}000$, 5~cm GSD. Segment filter $> 20$\%. Det.\ = detected, Gnt.\ = giant-covered, Miss.\ = missed.}
 \label{tab:object_detection}
-\begin{tabular}{lrrrrrrrrr}
+\begin{tabular}{llrrrrrrr}
 \toprule
-Class & $n$ & Det. & Gnt. & Miss. & Det.\ (\%) & IoU & Recall & Ratio & $\bar{n}$ \\
+Dataset & Class & $n$ & Det.\ (\%) & Gnt. & Miss. & IoU & Recall & $\bar{n}$ \\
 \midrule
-Buildings   & 2{,}059 & 1{,}952 & 106 &   1 & 94.8 & 0.81 & 0.94 & 1.1 & 2.9 \\
-Trees       & 5{,}443 & 5{,}206 & 237 &   0 & 95.6 & 0.94 & 0.98 & 1.0 & 1.1 \\
-Cars        & 1{,}755 & 1{,}402 & 352 &   1 & 79.9 & 0.79 & 0.95 & 1.2 & 1.0 \\
-Pools       & 1{,}157 & 1{,}006 & 151 &   0 & 86.9 & 0.72 & 0.94 & 1.4 & 1.1 \\
-Roads       &    108 &     39 &  67 &   2 & 36.1 & 0.59 & 0.73 & 1.0 & 31.0 \\
-Courts      &     53 &     53 &   0 &   0 & 100  & 0.73 & 0.94 & 1.3 & 1.3 \\
-Lakes       &      9 &      9 &   0 &   0 & 100  & 0.74 & 0.93 & 1.3 & 3.3 \\
-Decks       &     10 &      8 &   2 &   0 & 80.0 & 0.84 & 0.96 & 1.1 & 1.0 \\
+\multirow{8}{*}{BSB-1} & Buildings   & 2{,}055 & 94.7 & 107 &   1 & 0.82 & 0.95 & 2.8 \\
+ & Trees       & 5{,}440 & 95.7 & 234 &   0 & 0.94 & 0.98 & 1.1 \\
+ & Cars        & 1{,}717 & 81.3 & 318 &   3 & 0.79 & 0.96 & 1.0 \\
+ & Pools       & 1{,}154 & 86.9 & 151 &   0 & 0.73 & 0.95 & 1.1 \\
+ & Roads       &      68 & 57.4 &  29 &   0 & 0.60 & 0.75 & 30.1 \\
+ & Courts      &      53 & 100  &   0 &   0 & 0.75 & 0.96 & 1.3 \\
+ & Lakes       &       9 & 100  &   0 &   0 & 0.78 & 0.97 & 3.1 \\
+ & Decks       &      10 & 80.0 &   2 &   0 & 0.84 & 0.96 & 1.0 \\
+\midrule
+\multirow{6}{*}{Potsdam-1} & Buildings   &      78 & 96.2 &   3 &   0 & 0.88 & 0.96 & 9.2 \\
+ & Cars        &     257 & 96.9 &   7 &   1 & 0.83 & 0.92 & 1.0 \\
+ & Trees       &     280 & 67.1 &  92 &   0 & 0.47 & 0.56 & 2.9 \\
+ & Low veg.    &     396 & 50.5 & 195 &   1 & 0.52 & 0.67 & 2.5 \\
+ & Impervious  &     103 & 56.3 &  44 &   1 & 0.52 & 0.70 & 8.7 \\
+ & Clutter     &     279 & 71.7 &  79 &   0 & 0.61 & 0.73 & 1.6 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Trees achieve the highest detection rate (95.6\%) and IoU (0.94), as tree canopies present strong visual contrast against surrounding surfaces and SAM2 segments them with minimal overflow (ratio 1.0$\times$). Buildings are detected at 94.8\% with IoU 0.81 and an average of 2.9 segments per building, consistent with SAM2 splitting rooftops along texture and shadow boundaries. The merged reconstruction covers 94\% of each building's area on average.
+On BSB-1 at 24~cm GSD, trees achieve the highest detection rate (95.7\%) and IoU (0.94). Buildings are detected at 94.7\% with IoU 0.82 and an average of 2.8 segments per building. Cars reach 81.3\% detection (IoU 0.79), with the remaining 18.5\% covered exclusively by segments that extend far beyond the car footprint. Roads reach 57.4\% detection with an average of 30.1 segments per road polygon. Sports courts and lakes achieve 100\% detection.
 
-Cars are detected at 79.9\%, with 20\% of cars classified as giant-covered. These giant-covered cars have only overlapping SAM segments that extend well beyond the car footprint (e.g., a segment covering an entire parking row). At 24~cm GSD, a car occupies approximately 12$\times$12~pixels, near the lower limit of SAM2's effective detection resolution. The detected cars achieve IoU 0.79 with ratio 1.2$\times$, indicating that when a car-sized segment exists, it aligns well with the GT boundary.
+On Potsdam-1 at 5~cm GSD, buildings are detected at 96.2\% with IoU 0.88, and cars at 96.9\% with IoU 0.83. Trees (67.1\%) and low vegetation (50.5\%) achieve lower detection rates. Impervious surfaces reach 56.3\%.
 
-Roads represent the most challenging class: only 36.1\% are detected as coherent objects, with 62\% classified as giant-covered. The average of 31 segments per road polygon reflects extreme fragmentation of these elongated, tile-spanning features. Despite this, per-pixel ASA for roads reaches 95.2\% (Table~\ref{tab:asa_class}), indicating that individual road segments are correctly classified even when the object-level reconstruction fails.
+Car detection reaches 81.3\% at 24~cm GSD (BSB-1) and 96.9\% at 5~cm GSD (Potsdam-1). Building detection is 94.7\% and 96.2\%, respectively.
+
+On BSB-1, reducing tile size from 1{,}000 to 250 increases car detection from 40.9\% (IoU 0.66) to 81.3\% (IoU 0.79), tree detection from 64.2\% (IoU 0.80) to 95.7\% (IoU 0.94), and building detection from 87.4\% (IoU 0.77) to 94.7\% (IoU 0.82). Fig.~\ref{fig:tilesize_cars} illustrates this progression for car detection.
+
+On BSB-1, ASA peaks at $T = 500$ (90.1\%) while per-object detection rates are highest at $T = 250$. At $T = 250$, segments that detect more objects extend further into surrounding background: the fraction of object-segment pixels falling outside the object boundary increases from 5.4\% ($T = 500$) to 7.7\% ($T = 250$).
 
 \subsection{Scalability}
 \label{sec:res_scalability}
@@ -719,7 +710,7 @@ RemoteSAMsing produces over-segmentation by design: a single building may be spl
 
 Under this paradigm, a building roof divided into two segments is not an error provided neither segment leaks into adjacent objects and both are correctly classifiable as ``building'' in downstream analysis.
 
-The ASA metric \citep{stutz2018superpixels} provides a direct quantitative test of this suitability. On BSB-1, RemoteSAMsing achieves an ASA of 97.6\% at $T = 250$, meaning that if each segment is assigned its majority GT class, 97.6\% of all GT pixels receive the correct label. This establishes a high ceiling for any downstream OBIA classifier operating on these segments. Per-class ASA exceeds 95\% for buildings, trees, roads, and lakes, with lower values for cars (83.7\%) and swimming pools (91.1\%) reflecting the difficulty of delineating small objects at 24~cm resolution. The object-level evaluation confirms that buildings are detected at 94.8\% with a mean IoU of 0.81 despite being split into an average of 2.9 fragments, and trees achieve 95.6\% detection with IoU of 0.94. These results indicate that RemoteSAMsing segments are suitable as input units for OBIA classification pipelines.
+The ASA metric \citep{stutz2018superpixels} provides a direct quantitative test of this suitability. RemoteSAMsing achieves an ASA of 90.1\% on BSB-1 ($T = 500$) and 75.8\% on Potsdam-1 ($T = 1{,}000$), meaning that a downstream classifier assigning each segment its majority ground truth class can achieve at most 75--90\% accuracy without additional refinement. The object-level evaluation confirms that buildings are detected at 94.7\% (BSB-1) and 96.2\% (Potsdam-1) with IoU of 0.82 and 0.88, respectively, despite being split into 2.8--9.2 fragments on average. Trees achieve 95.7\% detection with IoU of 0.94 on BSB-1. These results, consistent across two datasets with different ground truth sources and spatial resolutions, indicate that RemoteSAMsing segments are suitable as input units for OBIA classification pipelines.
 
 Compared to traditional superpixel methods such as SLIC \cite{achanta2012slic}, RemoteSAMsing offers a key advantage: the segments are generated by a foundation model trained on over one billion natural image masks, giving them semantic awareness that purely spectral/spatial methods lack. SAM2 tends to produce boundaries that align with semantically meaningful edges (e.g., object contours) rather than arbitrary spectral gradients, potentially improving downstream classification performance.
 
@@ -732,9 +723,11 @@ Several limitations warrant discussion.
 
 \textit{No semantic output.} RemoteSAMsing produces instance-agnostic segments without class labels. Downstream classification (e.g., random forest on segment-level features) is required to produce thematic maps. This is inherent to SAM2's design as a class-agnostic segmentation model.
 
-\textit{Small object delineation.} Cars achieve 79.9\% object detection at $T = 250$, with the remaining 20\% covered exclusively by segments whose area exceeds five times the car footprint, segments that encompass the car along with surrounding pavement rather than delineating it individually. At 24~cm GSD, a typical car occupies approximately 12$\times$12~pixels ($\sim$8~m$^2$), and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit. Higher-resolution imagery (e.g., 5~cm GSD, where the same car spans $\sim$50$\times$50~pixels) is expected to improve individual car delineation substantially.
+\textit{Small object delineation.} Cars achieve 81.3\% object detection at $T = 250$ on BSB-1, with the remaining 18.5\% covered exclusively by segments that extend far beyond the car footprint. At 24~cm GSD, a typical car occupies approximately 12$\times$12~pixels ($\sim$8~m$^2$), and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit. At 5~cm GSD (Potsdam-1), car detection reaches 96.9\%, confirming that spatial resolution is the primary limiting factor.
 
-\textit{Linear features.} Roads represent the most difficult object class, with only 36.1\% object detection despite high per-pixel ASA (95.2\%). This apparent contradiction arises because road segments are numerous (an average of 31 segments per road polygon) and individually small, so each segment's majority class is often correct, but the fragmented reconstruction fails the object-level detection criterion. Elongated, connected structures that span multiple tiles remain fundamentally challenging for a tile-based approach.
+\textit{Linear features.} Roads represent the most difficult object class on BSB-1, with 57.4\% object detection and an average of 30.1 segments per road polygon. Elongated, connected structures that span multiple tiles remain challenging for a tile-based approach.
+
+\textit{Tile size and resolution interaction.} On Potsdam-1 at 5~cm GSD, tile sizes below $T = 1{,}000$ cause merge chaining that degrades ASA from 75.8\% to 46.0\% at $T = 250$. This limits the potential for small-object detection improvement through tile size reduction at high spatial resolutions.
 
 \textit{Processing time.} Although time scales linearly with tile count, the absolute processing time remains substantial for very large images: approximately 14 hours for 1{,}600 tiles at $T = 250$. GPU utilization per tile is dominated by SAM2 inference, with limited opportunity for parallelism within the current tile-sequential architecture.
 
@@ -750,12 +743,15 @@ Several limitations warrant discussion.
 This paper presented RemoteSAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images. The key findings are:
 \begin{enumerate}
     \item The multi-pass segmentation algorithm with black mask focusing and adaptive threshold decay increases coverage from 30--68\% (single-pass SAM2) to 89--98\%, with the black mask contributing 4--11~pp.
-    \item The Dense Grid point sampling strategy outperforms K-means by 1--3~pp on high-resolution urban scenes with many small objects, while both strategies perform equivalently on agricultural scenes with large objects.
-    \item The effectively linear boundary merge algorithm via Union-Find produces continuous segmentation across tile boundaries without boundary artifacts, enabling processing of images of arbitrary size with constant GPU memory usage.
-    \item The pipeline is sensor-agnostic, demonstrated across three sensors, two spectral compositions, and spatial resolutions from 5~cm to 4.78~m.
+    \item The Dense Grid point sampling strategy outperforms K-means by 1--3~pp on urban scenes with many small objects, while both strategies produce equivalent results on agricultural scenes.
+    \item The parameter-free best-match merge via Union-Find produces spatially consistent segmentation across tile boundaries in effectively linear time, enabling processing of images of arbitrary size with constant GPU memory usage.
+    \item Achievable Segmentation Accuracy reaches 90.1\% on BSB-1 (24~cm GSD) and 75.8\% on Potsdam-1 (5~cm GSD). Object-level evaluation confirms building detection at 94--96\% (IoU 0.82--0.88), car detection at 81--97\% depending on spatial resolution, and tree detection up to 96\% (IoU 0.94).
+    \item The pipeline is sensor-agnostic, operating on natural RGB (5~cm to 24~cm) and MNF false-color (4.78~m) without retraining.
 \end{enumerate}
 
-Future work will explore fine-tuning SAM2 on remote sensing data, integration with OBIA classification pipelines, and hierarchical multi-scale segmentation that applies targeted fine-resolution processing only to residual unsegmented areas.
+Tile size functions as an implicit scale parameter: reducing tile size from 1{,}000 to 250 increases car detection from 41\% to 81\% on BSB-1. At high spatial resolutions (5~cm GSD), tile sizes below 1{,}000 pixels cause merge chaining that degrades segmentation quality, establishing a practical minimum ground coverage per tile.
+
+Future work includes fine-tuning SAM2 on remote sensing data, integration with OBIA classification pipelines, hierarchical multi-scale segmentation that applies fine-resolution processing only to residual unsegmented areas, and an improved merge algorithm incorporating spectral similarity for high-resolution small tiles.
 
 % ============================================================================
 % References
