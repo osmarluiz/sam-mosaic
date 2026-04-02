@@ -183,7 +183,7 @@ RemoteSAMsing maximizes coverage within each tile through a multi-pass segmentat
 
 Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms work together within the loop: \textit{black mask focusing}, which directs SAM2's attention to unsegmented regions; \textit{adaptive threshold decay}, which progressively relaxes quality filters; and \textit{per-component mask acceptance}, which filters redundant and noisy outputs. Each is described below.
 
-\begin{algorithm}[t]
+\begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
 \label{alg:multipass}
 \begin{algorithmic}[1]
@@ -307,7 +307,7 @@ Unlike K-means, which always produces exactly $k$ centroids regardless of how mu
 
 The evaluation uses seven scenes from three datasets spanning different sensors, spatial resolutions, spectral compositions, and land cover types (Table~\ref{tab:datasets}).
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Overview of datasets used in the experiments. Tile counts refer to the default tile size of $1000 \times 1000$~pixels.}
 \label{tab:datasets}
@@ -340,7 +340,7 @@ Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
 
 All experiments use the SAM2.1 model with the Hiera Large backbone, the largest available checkpoint. The pipeline is implemented in Python~3.12 using PyTorch~2.9 with CUDA~12.8 for GPU inference. All experiments were run on a workstation equipped with an Intel Core i9-14900K CPU, 64~GB of RAM, and an NVIDIA RTX~4090 GPU with 24~GB of VRAM. The default configuration parameters are listed in Table~\ref{tab:config}. The source code is publicly available at \todo{repository URL}.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Default pipeline configuration parameters.}
 \label{tab:config}
@@ -374,7 +374,7 @@ Four experiments evaluate different aspects of RemoteSAMsing.
 
 To quantify the contribution of each pipeline component, seven configurations are tested on three representative scenes (one per dataset type: BSB-1 for high-resolution urban, Potsdam-1 for ultra-high-resolution urban, and Plant23 for agricultural). Table~\ref{tab:ablation_design} describes each configuration. The three single-pass baselines represent default SAM2 AMG inference at different quality thresholds, without any multi-pass mechanism. The remaining configurations selectively disable individual components from the full pipeline, isolating the marginal contribution of multi-pass iteration, black mask focusing, adaptive threshold decay, and contextual padding.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Component ablation configurations. Each row describes which pipeline components are active. The baseline (full pipeline) includes all components.}
 \label{tab:ablation_design}
@@ -430,12 +430,14 @@ The object-level protocol produces four metrics. \textbf{Detection rate} (\%) is
 \label{sec:results}
 % ============================================================================
 
+Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets, providing a visual overview of the results quantified in the following subsections.
+
 \subsection{Component Ablation}
 \label{sec:res_ablation}
 
 Table~\ref{tab:ablation} presents the coverage achieved by each pipeline configuration across three representative scenes.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Component ablation study. Coverage (\%) across three representative scenes. Configuration details are described in Table~\ref{tab:ablation_design}. Avg.\ $\Delta$ indicates the mean coverage difference relative to the baseline.}
 \label{tab:ablation}
@@ -463,7 +465,7 @@ Section~\ref{sec:res_quality} quantifies how these coverage differences translat
 
 Table~\ref{tab:strategy} compares the K-means and Dense Grid strategies across all seven scenes.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Point sampling strategy comparison: K-means vs.\ Dense Grid across all scenes. Best coverage per scene in bold. $\Delta$ = Dense $-$ K-means.}
 \label{tab:strategy}
@@ -491,7 +493,7 @@ Dense Grid outperforms K-means on all three Bras\'{i}lia scenes (+1.0 to +2.7~pp
 
 Table~\ref{tab:tilesize} shows the effect of tile size on coverage and processing time.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Effect of tile size on coverage and processing time. All runs use K-means with $e = 5$ erosion iterations.}
 \label{tab:tilesize}
@@ -535,7 +537,7 @@ Fig.~\ref{fig:merge} illustrates the effect of the merge strategy on three datas
 
 Table~\ref{tab:merge_strategy} quantifies this difference across all scenes.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Boundary merge comparison across all scenes (Dense Grid, $T = 1{,}000$). Coverage is identical; only segment count and number of merges differ.}
 \label{tab:merge_strategy}
@@ -632,7 +634,7 @@ On BSB-1, ASA peaks at $T = 500$ (90.1\%) while per-object detection rates are h
 
 Table~\ref{tab:scalability} summarizes per-tile processing times across all scenes.
 
-\begin{table}[t]
+\begin{table}[h!]
 \centering
 \caption{Scalability analysis across all scenes (K-means strategy, $T = 1{,}000$).}
 \label{tab:scalability}
