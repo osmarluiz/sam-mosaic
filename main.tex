@@ -131,57 +131,16 @@ For pixel-level segmentation of large RS images, where the number of segments ca
 \label{sec:methodology}
 % ============================================================================
 
-This section describes the RemoteSAMsing pipeline in three parts: Section~\ref{sec:method_scaling} addresses the challenge of scaling SAM2 to images larger than GPU memory through tiling, boundary merging, and post-processing; Section~\ref{sec:method_multipass} presents the multi-pass adaptive segmentation algorithm that maximizes coverage within each tile; and Section~\ref{sec:method_points} introduces the scene-dependent point sampling strategies. Fig.~\ref{fig:pipeline} provides an overview of the complete pipeline.
-
-% \begin{figure}[h!]
-%     \centering
-%     \includegraphics[width=\textwidth]{figures/pipeline_overview.pdf}
-%     \caption{Overview of the RemoteSAMsing pipeline. A large remote sensing image is divided into tiles with contextual padding. Each tile undergoes multi-pass adaptive segmentation using SAM2, where covered regions are progressively masked and thresholds are relaxed to capture increasingly difficult areas. After all tiles are processed, a boundary merge algorithm based on Union-Find unifies segments across tile edges, followed by post-processing to absorb enclosed fragments and remove noise. The output is a seamless labeled raster and vectorized polygons.}
-%     \label{fig:pipeline}
-% \end{figure}
-
-% ----------------------------------------------------------------------------
-\subsection{Scaling SAM2 to Large Images}
-\label{sec:method_scaling}
-% ----------------------------------------------------------------------------
-
-Remote sensing images routinely exceed tens of thousands of pixels in each dimension, while SAM2 internally resizes all inputs to $1024 \times 1024$ pixels. Processing such images in a single forward pass is infeasible both because of GPU memory constraints and because SAM2 would lose fine-grained detail due to the aggressive downscaling. RemoteSAMsing addresses this through a tiling scheme with contextual padding, a boundary merge algorithm, and targeted post-processing.
-
-\subsubsection{Tiling with contextual padding}
-\label{sec:method_tiling}
-
-The input image $I$ of size $W \times H$ is divided into a regular grid of non-overlapping tiles of size $T \times T$ pixels, yielding $\lfloor W/T \rfloor \times \lfloor H/T \rfloor$ tiles (residual pixels along the right and bottom edges that do not form a complete tile are excluded). Each tile is extracted with an additional padding of $p$ pixels on each side, resulting in an effective extraction window of $(T + 2p) \times (T + 2p)$ pixels. The padding region provides spatial context so that objects straddling tile boundaries are visible to SAM2 during inference. Unlike conventional overlap strategies where predictions from overlapping regions are blended or averaged, the padding here serves solely as context and is discarded afterward. Only the central $T \times T$ core contributes labels to the output mosaic.
-
-For tiles along the image border, the padding is limited to the available pixels, and the crop coordinates are adjusted accordingly to ensure that the core region always aligns to the output grid. The default configuration uses $T = 1000$ and $p = 50$, meaning SAM2 receives tiles of $1{,}100 \times 1{,}100$ pixels. In all datasets used in this study, image dimensions are exactly divisible by the tile sizes tested, so no pixels are excluded in practice.
-
-\subsubsection{Boundary merge via Union-Find}
-\label{sec:method_merge}
-
-Because each tile is segmented independently, the same real-world object may receive different label identifiers in adjacent tiles. A merge step is therefore necessary to produce a spatially consistent label mosaic. RemoteSAMsing implements this merge using a combination of boundary scanning, a lookup table (LUT), and the Union-Find data structure with path compression and union by rank.
-
-The algorithm operates as follows. First, for each tile boundary (both horizontal and vertical), the labels on 4-connected adjacent pixels across the discontinuity are compared. Let $\ell_a$ and $\ell_b$ be the labels at two such adjacent pixels on opposite sides of a tile boundary. If $\ell_a \neq \ell_b$ and both are foreground labels ($> 0$), the pair $(\ell_a, \ell_b)$ is recorded as a candidate merge together with its contact count (number of adjacent pixel pairs along that boundary line).
-
-Rather than requiring a fixed minimum-contact threshold $c_{\min}$, which forces a tradeoff between merging legitimate cross-tile objects (low $c_{\min}$) and avoiding spurious merges (high $c_{\min}$), RemoteSAMsing employs a \textit{best-match} strategy that is parameter-free. For each segment on one side of a tile boundary, the algorithm identifies the segment on the opposite side with the highest contact count. This is computed independently from both sides: every segment selects its highest-contact neighbor across the boundary. Only the resulting pairs are retained as merge candidates. This approach naturally handles both 1:1 merges (an object split across two tiles) and $N$:1 merges (an object fragmented into multiple segments on one side but correctly segmented as a single segment on the other), while avoiding spurious merges, since each segment commits to exactly one partner, the one with which it shares the most boundary pixels.
-
-After collecting all valid pairs from all tile boundaries, a Union-Find structure is built over the set of label identifiers. For each pair $(\ell_a, \ell_b)$, a union operation is performed, which implicitly handles transitive merges: if label $A$ merges with $B$ and $B$ merges with $C$, all three are assigned the same root label. Path compression ensures that the find operation runs in nearly constant amortized time. Finally, a LUT mapping each original label to its root is constructed, and the entire mosaic is relabeled in a single vectorized pass: $L_{\text{merged}}[i,j] = \text{LUT}[L[i,j]]$. The total complexity is $O(n \cdot \alpha(n))$, effectively linear in the number of pixels $n$, since boundary scanning is proportional to the tile perimeter, the Union-Find operations are bounded by the inverse Ackermann function $\alpha$, and the LUT relabeling is a single array pass.
-
-\subsubsection{Post-processing}
-\label{sec:method_post}
-
-After boundary merging, two additional operations clean the segmentation output, executed in sequence over a single 4-connected component labeling pass to avoid redundant computation.
-
-First, \textit{enclosed region absorption}: each connected component with area below a configurable threshold (default 500~pixels) is tested for enclosure. The algorithm examines all 4-connected boundary pixel pairs between the candidate component and its neighbors, collecting the set of distinct neighboring labels. A component is classified as enclosed when two conditions hold simultaneously: (1)~it borders exactly one non-background label, and (2)~none of its boundary pixels are adjacent to background (label~0). Enclosed components are relabeled to the identity of their sole neighbor. This operation targets small internal fragments that arise from SAM2 splitting heterogeneous areas within a single object, such as a shadow patch on a rooftop or a small vegetation gap within an agricultural field producing a spurious separate segment.
-
-Second, \textit{small segment removal}: any remaining connected component with area below a minimum threshold (default 100~pixels) that was not already absorbed in the previous step is reclassified as background. Both thresholds are specified in pixels and apply uniformly across datasets; at the resolutions tested (0.05--4.78~m), 100~pixels corresponds to areas ranging from 0.25~m$^2$ (Potsdam) to 2{,}285~m$^2$ (Plant23), in all cases well below the size of meaningful landscape features. The final output is a georeferenced raster where each pixel carries an integer segment identifier, optionally accompanied by vectorized polygon boundaries.
+RemoteSAMsing addresses two problems. First, SAM2's single-pass inference leaves 30--68\% of RS images unsegmented; Section~\ref{sec:method_multipass} describes the multi-pass algorithm that maximizes coverage within each tile by iteratively targeting residual unsegmented areas. Second, RS images routinely exceed SAM2's $1{,}024 \times 1{,}024$ input capacity; Section~\ref{sec:method_scaling} describes the tiling scheme, boundary merge algorithm, and post-processing that produce a spatially consistent segmentation of arbitrarily large images.
 
 % ----------------------------------------------------------------------------
 \subsection{Multi-Pass Adaptive Segmentation}
 \label{sec:method_multipass}
 % ----------------------------------------------------------------------------
 
-RemoteSAMsing maximizes coverage within each tile through a multi-pass segmentation algorithm. SAM2 inference through the Automatic Mask Generator (AMG) processes each input point independently and returns all masks that exceed the quality thresholds in a single forward pass. However, a single pass with high-quality thresholds captures only the most salient objects, leaving a substantial fraction of the image unsegmented. Lowering the thresholds to compensate introduces noisy, low-quality masks. The multi-pass strategy resolves this tension by iteratively focusing SAM2 on residual unsegmented areas while progressively relaxing quality thresholds only when progress stagnates.
+SAM2's Automatic Mask Generator (AMG) processes each input point independently and returns all masks that exceed the quality thresholds in a single forward pass. A single pass with high-quality thresholds captures only the most salient objects, leaving a substantial fraction of the image unsegmented. Lowering the thresholds to compensate introduces noisy, low-quality masks. The multi-pass strategy resolves this tension by iteratively focusing SAM2 on residual unsegmented areas while progressively relaxing quality thresholds only when progress stagnates.
 
-Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms work together within the loop: \textit{black mask focusing}, which directs SAM2's attention to unsegmented regions; \textit{adaptive threshold decay}, which progressively relaxes quality filters; and \textit{per-component mask acceptance}, which filters redundant and noisy outputs. Each is described below.
+The procedure operates as follows. The first pass distributes a uniform $k \times k$ point grid (default $k = 64$, yielding 4{,}096 points) across the full tile and runs SAM2 at the strictest thresholds ($\tau = 0.93$). Each subsequent pass first applies a black mask to render already-segmented pixels as featureless, then generates new sampling points on the remaining unsegmented area, runs SAM2, and accepts qualifying masks. This continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Three mechanisms work together within this loop: \textit{black mask focusing}, \textit{adaptive threshold decay}, and \textit{per-component mask acceptance}. Algorithm~\ref{alg:multipass} formalizes the complete procedure; each mechanism is described below.
 
 \begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
@@ -211,56 +170,28 @@ Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms 
 \end{algorithmic}
 \end{algorithm}
 
-\textbf{Black mask focusing.} After each pass, all pixels that have been assigned to a segment are set to black $(0, 0, 0)$ in the input image before the next pass. Empirically, SAM2 produces few or no mask candidates over uniform black regions, effectively ignoring already-segmented areas and concentrating predictions on the remaining unsegmented regions. Without this mechanism, SAM2 repeatedly generates masks for the same prominent objects across passes, wasting computational budget without increasing coverage. In principle, setting pixels to $(0,0,0)$ could suppress real objects that are naturally very dark, such as deep shadows in urban scenes; in practice, shadows in optical remote sensing imagery retain non-zero pixel values due to atmospheric scattering and sensor noise, so this collision does not occur at the bit-exact $(0,0,0)$ level. The ablation study (Section~\ref{sec:res_ablation}) quantifies the impact of removing the black mask on coverage.
+\textbf{Black mask focusing.} After each pass, all pixels assigned to a segment are set to black $(0, 0, 0)$ in the input image. SAM2 produces few or no mask candidates over uniform black regions, effectively concentrating predictions on the remaining unsegmented areas. Without this mechanism, SAM2 repeatedly generates masks for the same prominent objects across passes, wasting computational budget without increasing coverage. The ablation study (Section~\ref{sec:res_ablation}) quantifies this effect. In principle, setting pixels to $(0,0,0)$ could suppress objects that are naturally very dark; in practice, shadows in optical RS imagery retain non-zero values due to atmospheric scattering, so this collision does not occur at the bit-exact $(0,0,0)$ level.
 
-\textbf{Adaptive threshold decay.} SAM2's AMG accepts two quality filters: the predicted IoU threshold $\tau_{\text{iou}}$ and the stability score threshold $\tau_{\text{stab}}$. Masks below either threshold are discarded. In the multi-pass approach, the initial pass uses high thresholds ($\tau_{\text{iou}}^{\text{start}} = \tau_{\text{stab}}^{\text{start}} = 0.93$) to capture only high-confidence segments. The value 0.93 corresponds to the upper range of SAM2's internal quality scores, where virtually all accepted masks are spatially coherent; values above 0.95 produced negligible output in preliminary tests. When a pass produces no new masks or the coverage gain falls below 0.1 percentage points (a stagnation threshold chosen to be well below the per-pass gains observed during active segmentation, typically 2--15 percentage points, while remaining large enough to avoid unnecessary passes over diminishing returns), both thresholds are reduced simultaneously by a fixed step $\Delta = 0.01$, allowing SAM2 to propose masks for regions that it is less confident about. This process continues until the thresholds reach their lower bounds ($\tau_{\text{iou}}^{\text{end}} = \tau_{\text{stab}}^{\text{end}} = 0.60$) or the target coverage is achieved. The lower bound of 0.60 was determined empirically: below this value, SAM2 produces predominantly noisy masks that degrade segmentation quality. Threshold relaxation therefore occurs only when progress stagnates, preserving mask quality in earlier passes.
+\textbf{Adaptive threshold decay.} SAM2's AMG filters masks by two quality scores: predicted IoU ($\tau_{\text{iou}}$) and stability ($\tau_{\text{stab}}$). The initial pass uses high thresholds ($\tau_{\text{iou}}^{\text{start}} = \tau_{\text{stab}}^{\text{start}} = 0.93$), corresponding to the upper range of SAM2's internal quality scores where virtually all accepted masks are spatially coherent. When a pass produces no new masks or coverage gain falls below 0.1 percentage points, both thresholds are reduced by $\Delta = 0.01$. This continues until the thresholds reach $\tau^{\text{end}} = 0.60$, below which SAM2 produces predominantly noisy masks. Threshold relaxation occurs only when progress stagnates, preserving mask quality in earlier passes.
 
-\textbf{Mask acceptance criteria.} Each mask returned by SAM2 may contain multiple disconnected regions (e.g., when SAM2 groups visually similar but spatially separate areas). The algorithm splits every mask into its 4-connected components and evaluates each component independently against two criteria: (1)~\textit{minimum area}: components smaller than $a_{\min}$ pixels (default 100) are discarded as noise; and (2)~\textit{overlap ratio}: if 50\% or more of the component's pixels are already covered by existing segments, the component is considered redundant and rejected. The 50\% majority threshold balances accepting masks that extend into new territory against rejecting masks that largely duplicate existing segments. Components passing both criteria are assigned a unique label and added to the coverage mask. This per-component evaluation prevents a single large SAM2 mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
+\textbf{Mask acceptance criteria.} Each SAM2 mask may contain disconnected regions. The algorithm splits every mask into 4-connected components and evaluates each independently: components smaller than $a_{\min}$ pixels (default 100) are discarded, and components where 50\% or more of the pixels are already covered by existing segments are rejected as redundant. This per-component evaluation prevents a large mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
 
-% \begin{figure}[h!]
-%     \centering
-%     \includegraphics[width=\textwidth]{figures/multipass_sequence.pdf}
-%     \caption{Multi-pass segmentation sequence on an example tile. (a)~Original image. (b)~After pass~0: high-confidence segments captured at $\tau_{\text{iou}} = 0.93$. (c)~Black mask applied: covered regions set to black. (d)~After pass~3: additional segments captured at lower thresholds. (e)~Final result after all passes. The coverage increases from 45\% after pass~0 to 97\% after convergence.}
-%     \label{fig:multipass}
-% \end{figure}
+\textbf{Point sampling strategies.} The first pass uses a uniform grid. For subsequent passes, points must target the residual unsegmented area, which shrinks and fragments as passes accumulate. RemoteSAMsing provides two strategies. \textit{K-means clustering} samples up to 10{,}000 coordinates from the residual mask and applies K-means with $k = 64$ clusters; centroids are snapped to valid pixels. The resulting distribution concentrates points in the largest residual areas. \textit{Dense Grid} generates a uniform $k \times k$ grid and discards points on already-segmented pixels. Unlike K-means, Dense Grid maintains uniform density across all residual regions regardless of their size, benefiting scenes with many small scattered objects. Section~\ref{sec:res_strategy} compares both strategies.
 
 % ----------------------------------------------------------------------------
-\subsection{Scene-Dependent Point Sampling}
-\label{sec:method_points}
+\subsection{Scaling to Large Images}
+\label{sec:method_scaling}
 % ----------------------------------------------------------------------------
 
-SAM2's AMG requires a set of input points as prompts, generating one or more candidate masks per point and retaining those that exceed the quality thresholds. The spatial distribution of these points therefore directly influences which objects are detected.
+Remote sensing images routinely exceed tens of thousands of pixels per dimension, while SAM2 internally resizes all inputs to $1{,}024 \times 1{,}024$ pixels. RemoteSAMsing divides the input image into tiles, processes each tile independently with the multi-pass algorithm (Section~\ref{sec:method_multipass}), and unifies the results into a spatially consistent segmentation.
 
-In the first pass ($t = 0$), RemoteSAMsing distributes a uniform $k \times k$ grid (default $k = 64$, yielding 4{,}096 points) across the full tile. For subsequent passes ($t \geq 1$), points must be placed on the residual unsegmented area, which shrinks and fragments as passes accumulate. RemoteSAMsing provides two strategies for this residual point sampling, designed for different scene characteristics.
+The input image of size $W \times H$ is divided into a regular grid of non-overlapping tiles of size $T \times T$ pixels. Each tile is extracted with an additional contextual padding of $p$ pixels on each side, resulting in an extraction window of $(T + 2p) \times (T + 2p)$ pixels. The padding provides spatial context so that objects straddling tile boundaries are visible to SAM2 during inference. Unlike overlap strategies where predictions from overlapping regions are blended, the padding serves solely as context: only the central $T \times T$ core contributes labels to the output mosaic. The default configuration uses $T = 1{,}000$ and $p = 50$.
 
-\subsubsection{K-means clustering}
-\label{sec:method_kmeans}
+Even with padding, tiles are segmented independently, so the same object may receive different labels in adjacent tiles. A merge step produces a spatially consistent label mosaic. For each tile boundary (horizontal and vertical), the algorithm compares labels on adjacent pixels across the boundary and records the contact count for each pair. Rather than merging all touching pairs (which would produce spurious merges between unrelated segments), RemoteSAMsing employs a parameter-free \textit{best-match} strategy: each segment selects the neighbor with the highest contact count, and only these best-match pairs are retained. This approach handles both 1:1 merges (an object split across two tiles) and $N$:1 merges (an object fragmented on one side but whole on the other), while each segment commits to exactly one merge partner.
 
-The K-means strategy generates points that adapt to the spatial distribution of the residual area. From the binary residual mask (uncovered pixels), up to 10{,}000 pixel coordinates are randomly sampled, large enough to represent the spatial distribution of residual areas reliably, while keeping MiniBatch K-means clustering tractable in under 50~ms per pass. K-means with $k = 64$ clusters is then applied to these coordinates, and each cluster centroid is snapped to the nearest valid pixel to produce the final point set. The resulting distribution reflects the spatial density of the unsegmented region: large contiguous residual areas attract more points, while isolated small fragments receive fewer.
+The merge pairs are processed by a Union-Find structure with path compression, which handles transitive merges implicitly. A lookup table maps each original label to its root, and the entire mosaic is relabeled in a single pass. The total complexity is $O(n \cdot \alpha(n))$, effectively linear in the number of pixels.
 
-For scenes dominated by large, homogeneous objects such as agricultural fields, the residual area after initial passes tends to consist of a few large contiguous regions. K-means concentrates points proportionally to area, ensuring that these regions receive adequate sampling density.
-
-\subsubsection{Dense grid}
-\label{sec:method_dense}
-
-The Dense Grid strategy maintains a fixed uniform grid across all passes, relying on spatial filtering rather than adaptive placement. A $k \times k$ regular grid (same density as pass~0) is generated over the full tile, and grid points that fall on already-segmented pixels are discarded. Only points landing on residual unsegmented area are kept.
-
-Unlike K-means, which always produces exactly $k$ centroids regardless of how much area remains, the Dense Grid maintains uniform point density across all unsegmented regions but its effective point count decreases as coverage grows: at 95\% coverage, only approximately 5\% of the original $k^2$ grid points survive filtering. This property benefits urban scenes containing many small, scattered objects (e.g., cars, narrow pathways, small roof sections) that may be individually too small to attract a K-means centroid but are numerous enough to collectively represent significant unsegmented area. Section~\ref{sec:res_strategy} compares both strategies across scene types.
-
-% \begin{figure}[h!]
-%     \centering
-%     \begin{subfigure}[t]{0.48\textwidth}
-%         \includegraphics[width=\textwidth]{figures/points_kmeans.pdf}
-%         \caption{K-means: points cluster in large residual areas.}
-%     \end{subfigure}
-%     \hfill
-%     \begin{subfigure}[t]{0.48\textwidth}
-%         \includegraphics[width=\textwidth]{figures/points_dense.pdf}
-%         \caption{Dense Grid: uniform coverage of all residual areas.}
-%     \end{subfigure}
-%     \caption{Comparison of point sampling strategies on a partially segmented urban tile (pass~3). Gray areas are already segmented. Red dots indicate SAM2 input points. K-means concentrates points in the largest residual patch (upper left), while Dense Grid distributes points uniformly across all unsegmented areas, including small gaps between buildings.}
-%     \label{fig:points}
-% \end{figure}
+After merging, two post-processing operations clean the output. First, small connected components (${<}\,500$ pixels) that are entirely enclosed by a single neighboring segment are absorbed into that neighbor, targeting internal fragments such as shadow patches within buildings. Second, remaining components smaller than 100 pixels are removed. At the resolutions tested (0.05--4.78~m), 100 pixels corresponds to 0.25~m$^2$ (Potsdam) to 2{,}285~m$^2$ (Plant23), well below the size of meaningful landscape features. The final output is a georeferenced raster with integer segment identifiers.
 
 
 % ============================================================================
