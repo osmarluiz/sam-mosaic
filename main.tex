@@ -219,7 +219,7 @@ Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
 \end{tabular}
 \end{table}
 
-\textbf{ISPRS Potsdam.} Three image patches (3\_13, 5\_12, 5\_13) from the ISPRS 2D Semantic Labeling Contest over Potsdam, Germany. The images are true-color RGB aerial orthophotos at 5~cm ground sampling distance, covering a dense European urban landscape with buildings, streets, cars, trees, and low vegetation. Each image is $6{,}000 \times 6{,}000$ pixels, corresponding to $300 \times 300$~m on the ground. This is the only dataset with publicly available semantic ground truth (six land cover classes), which serves as the basis for boundary quality assessment (Section~\ref{sec:res_boundary}).
+\textbf{ISPRS Potsdam.} Three image patches (3\_13, 5\_12, 5\_13) from the ISPRS 2D Semantic Labeling Contest over Potsdam, Germany. The images are true-color RGB aerial orthophotos at 5~cm ground sampling distance, covering a dense European urban landscape with buildings, streets, cars, trees, and low vegetation. Each image is $6{,}000 \times 6{,}000$ pixels, corresponding to $300 \times 300$~m on the ground. This is the only dataset with publicly available semantic ground truth (six land cover classes), used for segmentation quality assessment (Section~\ref{sec:res_quality}).
 
 \textbf{Bras\'{i}lia.} Three crops of $8{,}000 \times 8{,}000$ pixels extracted from a high-resolution aerial survey of Bras\'{i}lia, Brazil, at 24~cm ground sampling distance. The three crops represent distinct urban morphologies: BSB-1 covers a residential area with individual houses, gardens, and narrow streets; BSB-2 covers a commercial district with large buildings, wide avenues, and parking lots; and BSB-3 covers a mixed area with both urban structures and green spaces. At 24~cm resolution, individual cars, sidewalks, and small urban features are clearly visible, resulting in a high density of small objects. Each crop corresponds to approximately $1{,}920 \times 1{,}920$~m on the ground.
 
@@ -271,7 +271,7 @@ Seven configurations isolate the role of each component. Three single-pass SAM2 
 
 Both point strategies (K-means and Dense Grid) are evaluated at three tile sizes ($T \in \{250, 500, 1{,}000\}$) across all seven scenes. $T = 1{,}000$ is selected as a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize while producing tiles that divide evenly into common image dimensions. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively. All scenes are included because the relative performance of each strategy depends on the size distribution of objects in each scene.
 
-On BSB-1 and Potsdam-1, segmentation quality is assessed using two protocols. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} measures global superpixel quality by assigning each segment its majority ground truth class. An object-level protocol evaluates individual GT objects: overlapping SAM segments where more than 20\% of the segment area falls inside the GT polygon are merged, and IoU is computed between the merged reconstruction and the GT object. Sensitivity analysis across filtering thresholds from 5\% to 50\% confirms that results are stable within the 10--30\% range. Section~\ref{sec:exp_metrics} defines the resulting metrics.
+On BSB-1, Potsdam-1, and Plant23, segmentation quality is assessed using two protocols. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} measures global superpixel quality by assigning each segment its majority ground truth class. An object-level protocol evaluates individual GT objects: overlapping SAM segments where more than 20\% of the segment area falls inside the GT polygon are merged, and IoU is computed between the merged reconstruction and the GT object. Sensitivity analysis across filtering thresholds from 5\% to 50\% confirms that results are stable within the 10--30\% range. Section~\ref{sec:exp_metrics} defines the resulting metrics.
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
@@ -435,6 +435,9 @@ Fig.~\ref{fig:padding} illustrates the effect of contextual padding. Without pad
     \label{fig:padding}
 \end{figure}
 
+\subsection{Segmentation Quality Assessment}
+\label{sec:res_quality}
+
 Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on all three datasets. For BSB-1 and Plant23, unannotated background (42\% and 48\% of the image, respectively) is treated as a separate class to ensure that all pixels contribute to the metric, matching the exhaustive labeling of the ISPRS Potsdam dataset. For Potsdam-1, object instances are extracted as connected components from the ISPRS semantic labels.
 
 \begin{table}[h!]
@@ -573,14 +576,14 @@ This finding motivates a potential hierarchical multi-scale approach: an initial
 
 On Potsdam-1 (5~cm GSD) and Plant23 (4.78~m GSD), reducing tile size below $T = 1{,}000$ degrades segmentation quality rather than improving it. At $T = 250$ on Potsdam-1, the largest merged segment covers 70.4\% of the image and ASA drops from 75.8\% to 46.0\%. The same pattern occurs on Plant23, where ASA drops from 98.0\% to 78.7\%.
 
-The degradation arises because tiles that cover too little ground area contain insufficient object diversity. At 5~cm GSD, a $250 \times 250$ tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface (one rooftop, one grass patch). SAM2 segments the entire tile as one object. The merge algorithm then chains these single-segment tiles transitively through Union-Find, creating mega-segments that span the image. At 4.78~m GSD, a $250 \times 250$ tile covers $1{,}194 \times 1{,}194$~m, which is sufficient ground coverage, but the large agricultural fields span multiple tiles and the same chaining effect occurs.
+The degradation arises because tiles that cover too little ground area contain insufficient object diversity. At 5~cm GSD, a $250 \times 250$ tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface (one rooftop, one grass patch). SAM2 segments the entire tile as one object. The merge algorithm then chains these single-segment tiles transitively through Union-Find, creating mega-segments that span the image. At 4.78~m GSD, a $250 \times 250$ tile covers $1{,}194 \times 1{,}194$~m; although the ground area per tile is large, individual agricultural fields span multiple tiles and produce single-segment tiles that chain through the merge algorithm.
 
 BSB-1 at 24~cm GSD does not exhibit this problem because $T = 250$ covers $60 \times 60$~m, large enough to contain multiple objects per tile. Across the three datasets, tile configurations covering approximately 50~m or more per side produce stable results. This is a limitation of the merge algorithm, not of SAM2: the per-tile segmentation before merge is correct, but the boundary-contact-based merge cannot distinguish legitimate from spurious merges when tiles are dominated by a single segment. An improved merge algorithm incorporating spectral or textural similarity could mitigate this effect.
 
 \subsection{Sensor and Composition Agnosticism}
 \label{sec:disc_sensor}
 
-RemoteSAMsing achieves high coverage (97.7--97.8\%) on Plant23 despite its MNF false-color composition, an RGB rendering derived from statistical transformations of multispectral bands that bears no resemblance to the natural images in SAM2's training data. This result is consistent with the hypothesis that SAM2's learned representations respond primarily to spatial gradients and textural boundaries rather than to the spectral meaning of the RGB channels. If this generalizes beyond MNF composites, remote sensing practitioners could compose any three informative bands into an RGB image and obtain meaningful segments, provided there is sufficient spatial contrast between objects.
+RemoteSAMsing achieves high coverage (97.7--99.4\%) and ASA of 98.0\% on Plant23 despite its MNF false-color composition, an RGB rendering derived from statistical transformations of multispectral bands that bears no resemblance to the natural images in SAM2's training data. Pivot irrigation fields are detected at 100\% with IoU 0.99, and crop fields at 94.6\% with IoU 0.98. This is consistent with the hypothesis that SAM2's learned representations respond primarily to spatial gradients and textural boundaries rather than to the spectral meaning of the RGB channels. If this generalizes beyond MNF composites, remote sensing practitioners could compose any three informative bands into an RGB image and obtain meaningful segments, provided there is sufficient spatial contrast between objects.
 
 \subsection{RemoteSAMsing as a Superpixel Generator for OBIA}
 \label{sec:disc_obia}
