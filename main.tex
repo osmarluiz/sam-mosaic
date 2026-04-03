@@ -435,34 +435,34 @@ Fig.~\ref{fig:padding} illustrates the complementary role of contextual padding.
     \label{fig:padding}
 \end{figure}
 
-Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on two datasets. For BSB-1, unannotated background (42\% of the image) is treated as a separate class to ensure that all pixels contribute to the metric, matching the exhaustive labeling of the ISPRS Potsdam dataset. For Potsdam-1, object instances are extracted as connected components from the ISPRS semantic labels.
+Table~\ref{tab:asa_global} presents the Achievable Segmentation Accuracy across pipeline configurations on all three datasets. For BSB-1 and Plant23, unannotated background (42\% and 48\% of the image, respectively) is treated as a separate class to ensure that all pixels contribute to the metric, matching the exhaustive labeling of the ISPRS Potsdam dataset. For Potsdam-1, object instances are extracted as connected components from the ISPRS semantic labels.
 
 \begin{table}[h!]
 \centering
-\caption{Achievable Segmentation Accuracy (ASA, \%) across datasets and configurations. BSB-1 includes unannotated background as a separate class for comparability with Potsdam-1, where ISPRS labels cover 100\% of pixels. Best result per dataset in bold.}
+\caption{Achievable Segmentation Accuracy (ASA, \%) across datasets and configurations. Unannotated background is treated as a separate class for BSB-1 and Plant23 to match Potsdam-1, where ISPRS labels cover 100\% of pixels. Best result per dataset in bold.}
 \label{tab:asa_global}
-\begin{tabular}{lrr}
+\begin{tabular}{lrrr}
 \toprule
-Configuration & BSB-1 (24~cm) & Potsdam-1 (5~cm) \\
+Configuration & BSB-1 (24~cm) & Potsdam-1 (5~cm) & Plant23 (4.78~m) \\
 \midrule
-Single pass ($\tau = 0.93$) & 67.0 & 53.8 \\
-Single pass ($\tau = 0.86$) & 78.3 & 68.0 \\
-Single pass ($\tau = 0.70$) & 86.9 & 79.6 \\
-Dense Grid ($T = 1{,}000$)  & 86.2 & \textbf{75.8} \\
-Dense Grid ($T = 500$)      & \textbf{90.1} & 60.4$^*$ \\
-Dense Grid ($T = 250$)      & 88.1 & 46.0$^*$ \\
+Single pass ($\tau = 0.93$) & 67.0 & 53.8 & 90.5 \\
+Single pass ($\tau = 0.86$) & 78.3 & 68.0 & 95.7 \\
+Single pass ($\tau = 0.70$) & 86.9 & 79.6 & 96.7 \\
+Dense Grid ($T = 1{,}000$)  & 86.2 & \textbf{75.8} & \textbf{98.0} \\
+Dense Grid ($T = 500$)      & \textbf{90.1} & 60.4$^*$ & 88.1$^*$ \\
+Dense Grid ($T = 250$)      & 88.1 & 46.0$^*$ & 78.7$^*$ \\
 \bottomrule
-\multicolumn{3}{l}{\footnotesize $^*$Degraded by merge chaining at 5~cm GSD (Section~\ref{sec:res_tilesize}).}
+\multicolumn{4}{l}{\footnotesize $^*$Degraded at smaller tile sizes (Section~\ref{sec:res_tilesize}).}
 \end{tabular}
 \end{table}
 
-Single-pass SAM2 achieves 53.8--67.0\% ASA depending on threshold and dataset. The full RemoteSAMsing pipeline raises ASA to 86.2\% on BSB-1 and 75.8\% on Potsdam-1 at $T = 1{,}000$. On BSB-1, ASA peaks at 90.1\% with $T = 500$ and decreases to 88.1\% at $T = 250$. On Potsdam-1, tile sizes below $T = 1{,}000$ degrade ASA due to merge chaining (Section~\ref{sec:res_tilesize}).
+Single-pass SAM2 achieves 53.8--90.5\% ASA depending on threshold and dataset. The full RemoteSAMsing pipeline raises ASA to 86.2\% on BSB-1, 75.8\% on Potsdam-1, and 98.0\% on Plant23 at $T = 1{,}000$. On BSB-1, ASA peaks at 90.1\% with $T = 500$ and decreases to 88.1\% at $T = 250$. On Potsdam-1 and Plant23, tile sizes below $T = 1{,}000$ degrade ASA (Section~\ref{sec:res_tilesize}).
 
-Table~\ref{tab:object_detection} presents the object-level evaluation for both datasets using the best configuration for each: Dense Grid $T = 250$ for BSB-1 (10{,}849 manually digitized GT polygons across eight classes) and Dense Grid $T = 1{,}000$ for Potsdam-1 (1{,}721 instances extracted from ISPRS semantic labels across six classes).
+Table~\ref{tab:object_detection} presents the object-level evaluation for all three datasets using the best configuration for each: Dense Grid $T = 250$ for BSB-1 (10{,}849 manually digitized GT polygons across eight classes), Dense Grid $T = 1{,}000$ for Potsdam-1 (1{,}721 instances from ISPRS semantic labels across six classes), and Dense Grid $T = 1{,}000$ for Plant23 (3{,}490 manually digitized polygons across three agricultural classes).
 
 \begin{table}[h!]
 \centering
-\caption{Object-level detection across datasets. BSB-1: Dense Grid $T = 250$, 24~cm GSD. Potsdam-1: Dense Grid $T = 1{,}000$, 5~cm GSD. Segment filter $> 20$\%. Det.\ = detected, Gnt.\ = giant-covered, Miss.\ = missed.}
+\caption{Object-level detection across datasets. Best configuration per dataset: BSB-1 at Dense Grid $T = 250$ (24~cm), Potsdam-1 at Dense Grid $T = 1{,}000$ (5~cm), Plant23 at Dense Grid $T = 1{,}000$ (4.78~m). Segment filter $> 20$\%.}
 \label{tab:object_detection}
 \begin{tabular}{llrrrrrrr}
 \toprule
@@ -483,6 +483,10 @@ Dataset & Class & $n$ & Det.\ (\%) & Gnt. & Miss. & IoU & Recall & $\bar{n}$ \\
  & Low veg.    &     396 & 50.5 & 195 &   1 & 0.52 & 0.67 & 2.5 \\
  & Impervious  &     103 & 56.3 &  44 &   1 & 0.52 & 0.70 & 8.7 \\
  & Clutter     &     279 & 71.7 &  79 &   0 & 0.61 & 0.73 & 1.6 \\
+\midrule
+\multirow{3}{*}{Plant23} & Pivot irrig.  &     508 & 100  &   0 &   0 & 0.99 & 1.00 & 1.0 \\
+ & Crop fields &   2{,}758 & 94.6 & 145 &   4 & 0.98 & 0.99 & 1.0 \\
+ & Lakes       &      73 & 89.0 &   8 &   0 & 0.95 & 0.97 & 1.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -491,7 +495,9 @@ On BSB-1 at 24~cm GSD, trees achieve the highest detection rate (95.7\%) and IoU
 
 On Potsdam-1 at 5~cm GSD, buildings are detected at 96.2\% with IoU 0.88, and cars at 96.9\% with IoU 0.83. Trees (67.1\%) and low vegetation (50.5\%) achieve lower detection rates. Impervious surfaces reach 56.3\%.
 
-Car detection reaches 81.3\% at 24~cm GSD (BSB-1) and 96.9\% at 5~cm GSD (Potsdam-1). Building detection is 94.7\% and 96.2\%, respectively.
+On Plant23 at 4.78~m GSD, pivot irrigation fields achieve 100\% detection with IoU 0.99. Crop fields reach 94.6\% (IoU 0.98) and lakes 89.0\% (IoU 0.95). The high IoU values reflect the large, spectrally homogeneous nature of agricultural objects.
+
+Across datasets, building detection ranges from 94.7\% (BSB-1) to 96.2\% (Potsdam-1). Car detection reaches 81.3\% at 24~cm and 96.9\% at 5~cm. Agricultural fields exceed 94\% detection with IoU above 0.97.
 
 On BSB-1, reducing tile size from 1{,}000 to 250 increases car detection from 40.9\% (IoU 0.66) to 81.3\% (IoU 0.79), tree detection from 64.2\% (IoU 0.80) to 95.7\% (IoU 0.94), and building detection from 87.4\% (IoU 0.77) to 94.7\% (IoU 0.82). Fig.~\ref{fig:tilesize_cars} illustrates this progression for car detection.
 
