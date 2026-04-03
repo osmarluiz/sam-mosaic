@@ -532,7 +532,7 @@ Dataset & Metric & SLIC & Felzenszwalb & RS \\
 \end{tabular}
 \end{table}
 
-RemoteSAMsing achieves the highest ASA on BSB-1 (90.1\% vs.\ 80.8\% SLIC and 76.8\% Felzenszwalb) and Plant23 (98.0\% vs.\ 86.6\% and 92.5\%). On Potsdam-1, SLIC achieves 78.9\% ASA compared to RemoteSAMsing's 75.8\%, attributable to the merge chaining effect discussed in Section~\ref{sec:res_tilesize}. In per-object detection, RemoteSAMsing achieves the highest IoU across all classes and datasets. SLIC fails to detect cars entirely on BSB-1 (0\% detection at 24~cm GSD) and detects only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. Felzenszwalb achieves competitive detection rates (63.9--99.6\%) but consistently lower IoU than RemoteSAMsing (0.41--0.91 vs.\ 0.79--0.99), indicating that graph-based segments align less precisely with real object contours.
+In per-object detection, RemoteSAMsing achieves the highest IoU across all classes and datasets. SLIC fails to detect cars entirely on BSB-1 (0\% at 24~cm GSD) and detects only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. Felzenszwalb achieves competitive detection rates (63.9--99.6\%) but consistently lower IoU (0.41--0.91 vs.\ 0.79--0.99 for RemoteSAMsing). RemoteSAMsing also achieves the highest ASA on BSB-1 (90.1\% vs.\ 80.8\% SLIC and 76.8\% Felzenszwalb) and Plant23 (98.0\% vs.\ 86.6\% and 92.5\%). On Potsdam-1, SLIC achieves 78.9\% ASA compared to RemoteSAMsing's 75.8\%; this is attributable to the merge chaining effect (Section~\ref{sec:res_tilesize}) and does not reflect object-level quality, where RemoteSAMsing achieves higher IoU on every class.
 
 \subsection{Scalability}
 \label{sec:res_scalability}
