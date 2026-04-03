@@ -186,31 +186,27 @@ Algorithm~\ref{alg:multipass} presents the complete procedure. Three mechanisms 
 \begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
 \label{alg:multipass}
-\small
 \begin{algorithmic}[1]
-\REQUIRE Image $I$ ($W \times H$); config $\mathcal{C}$ with $\tau^{\text{start}}, \tau^{\text{end}}, \Delta, k, a_{\min}, t_{\max}, \text{cov}_{\text{target}}$
-\ENSURE Label map $L$ ($W \times H$)
-\STATE $L, M \leftarrow \mathbf{0}_{W \times H}$; \; $\tau \leftarrow \tau^{\text{start}}$; \; $\ell \leftarrow 1$; \; $\text{cov}_{\text{prev}} \leftarrow 0$
-\FOR{$t = 0, 1, \ldots, t_{\max}$}
-    \IF{$t > 0$}
-        \STATE $I' \leftarrow \textsc{BlackMask}(I, M)$; \; $P \leftarrow \textsc{SamplePoints}(M, \mathcal{C})$ \COMMENT{K-means or Dense Grid}
-    \ELSE
-        \STATE $I' \leftarrow I$; \; $P \leftarrow \textsc{UniformGrid}(W, H, k)$
+\REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, target coverage
+\ENSURE Label map $L$
+\STATE Run SAM2 on $I$ with uniform $k \times k$ point grid at $\tau = \tau_{\text{start}}$
+\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing segments)
+\STATE Compute coverage
+\REPEAT
+    \STATE \textsc{Black Mask}: set segmented pixels to $(0, 0, 0)$ in $I$
+    \STATE \textsc{Point Sampling}: generate points on residual area (K-means or Dense Grid)
+    \STATE Run SAM2 on masked image with new points at threshold $\tau$
+    \STATE Accept qualifying masks, update labels and coverage
+    \IF{coverage $\geq$ target}
+        \STATE \textbf{stop}
     \ENDIF
-    \IF{$|P| = 0$} \textbf{break} \ENDIF
-    \STATE $\mathcal{M} \leftarrow \textsc{SAM2\_AMG}(I', P, \tau)$; \; $n_{\text{added}} \leftarrow 0$
-    \FORALL{connected component $c$ in each mask $m \in \mathcal{M}$}
-        \IF{$\text{area}(c) < a_{\min}$ \textbf{or} $|c \cap M| / |c| \geq 0.5$} \textbf{continue} \ENDIF
-        \STATE $L[c] \leftarrow \ell$; \; $M[c] \leftarrow 1$; \; $\ell \leftarrow \ell + 1$; \; $n_{\text{added}} \leftarrow n_{\text{added}} + 1$
-    \ENDFOR
-    \STATE $\text{cov} \leftarrow \sum M / (W \cdot H) \times 100$
-    \IF{$\text{cov} \geq \text{cov}_{\text{target}}$} \textbf{break} \ENDIF
-    \IF{$n_{\text{added}} = 0$ \textbf{or} $\text{cov} - \text{cov}_{\text{prev}} < 0.1$} \COMMENT{stagnation}
-        \IF{$\tau \leq \tau^{\text{end}}$} \textbf{break} \ENDIF \COMMENT{thresholds exhausted}
-        \STATE $\tau \leftarrow \max(\tau - \Delta, \; \tau^{\text{end}})$ \COMMENT{decay both $\tau_{\text{iou}}$ and $\tau_{\text{stab}}$}
+    \IF{coverage gain $< 0.1$ pp}
+        \STATE \textsc{Adaptive Decay}: reduce $\tau$ by $\Delta$
+        \IF{$\tau < \tau_{\text{end}}$}
+            \STATE \textbf{stop}
+        \ENDIF
     \ENDIF
-    \STATE $\text{cov}_{\text{prev}} \leftarrow \text{cov}$
-\ENDFOR
+\UNTIL{maximum passes reached}
 \RETURN $L$
 \end{algorithmic}
 \end{algorithm}
