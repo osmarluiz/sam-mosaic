@@ -506,6 +506,34 @@ On BSB-1, reducing tile size from 1{,}000 to 250 increases car detection from 40
 
 On BSB-1, ASA peaks at $T = 500$ (90.1\%) while per-object detection rates are highest at $T = 250$. At $T = 250$, segments that detect more objects extend further into surrounding background: the fraction of object-segment pixels falling outside the object boundary increases from 5.4\% ($T = 500$) to 7.7\% ($T = 250$).
 
+Table~\ref{tab:baseline_comparison} compares RemoteSAMsing against two traditional segmentation baselines: SLIC superpixels \citep{achanta2012slic} and Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}. Both baselines are configured to produce a comparable number of segments to RemoteSAMsing on each dataset.
+
+\begin{table}[h!]
+\centering
+\caption{Comparison with traditional segmentation baselines. ASA (\%) computed with background as separate class. Object-level metrics for selected classes (best IoU per class in bold). RS = RemoteSAMsing (best config per dataset).}
+\label{tab:baseline_comparison}
+\begin{tabular}{llrrr}
+\toprule
+Dataset & Metric & SLIC & Felzenszwalb & RS \\
+\midrule
+\multirow{4}{*}{BSB-1} & ASA & 80.8 & 76.8 & \textbf{90.1} \\
+ & Buildings (Det\% / IoU) & 69.5 / 0.70 & 90.9 / 0.73 & \textbf{94.7 / 0.82} \\
+ & Cars (Det\% / IoU) & 0.0 / -- & 63.9 / 0.53 & \textbf{81.3 / 0.79} \\
+ & Trees (Det\% / IoU) & 51.2 / 0.62 & 57.7 / 0.41 & \textbf{95.7 / 0.94} \\
+\midrule
+\multirow{3}{*}{Potsdam-1} & ASA & \textbf{78.9} & 61.0 & 75.8 \\
+ & Buildings (Det\% / IoU) & 85.9 / 0.75 & 93.6 / 0.71 & \textbf{96.2 / 0.88} \\
+ & Cars (Det\% / IoU) & 3.5 / 0.51 & 95.7 / 0.60 & \textbf{96.9 / 0.83} \\
+\midrule
+\multirow{3}{*}{Plant23} & ASA & 86.6 & 92.5 & \textbf{98.0} \\
+ & Pivot fields (Det\% / IoU) & 82.1 / 0.79 & 99.6 / 0.91 & \textbf{100 / 0.99} \\
+ & Crop fields (Det\% / IoU) & 25.1 / 0.70 & 81.7 / 0.65 & \textbf{94.6 / 0.98} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+RemoteSAMsing achieves the highest ASA on BSB-1 (90.1\% vs.\ 80.8\% SLIC and 76.8\% Felzenszwalb) and Plant23 (98.0\% vs.\ 86.6\% and 92.5\%). On Potsdam-1, SLIC achieves 78.9\% ASA compared to RemoteSAMsing's 75.8\%, attributable to the merge chaining effect discussed in Section~\ref{sec:res_tilesize}. In per-object detection, RemoteSAMsing achieves the highest IoU across all classes and datasets. SLIC fails to detect cars entirely on BSB-1 (0\% detection at 24~cm GSD) and detects only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. Felzenszwalb achieves competitive detection rates (63.9--99.6\%) but consistently lower IoU than RemoteSAMsing (0.41--0.91 vs.\ 0.79--0.99), indicating that graph-based segments align less precisely with real object contours.
+
 \subsection{Scalability}
 \label{sec:res_scalability}
 
@@ -584,6 +612,15 @@ BSB-1 at 24~cm GSD does not exhibit this problem because $T = 250$ covers $60 \t
 \label{sec:disc_sensor}
 
 RemoteSAMsing achieves high coverage (97.7--99.4\%) and ASA of 98.0\% on Plant23 despite its MNF false-color composition, an RGB rendering derived from statistical transformations of multispectral bands that bears no resemblance to the natural images in SAM2's training data. Pivot irrigation fields are detected at 100\% with IoU 0.99, and crop fields at 94.6\% with IoU 0.98. This is consistent with the hypothesis that SAM2's learned representations respond primarily to spatial gradients and textural boundaries rather than to the spectral meaning of the RGB channels. If this generalizes beyond MNF composites, remote sensing practitioners could compose any three informative bands into an RGB image and obtain meaningful segments, provided there is sufficient spatial contrast between objects.
+
+\subsection{Comparison with Traditional Segmentation Methods}
+\label{sec:disc_baselines}
+
+The comparison with SLIC and Felzenszwalb (Table~\ref{tab:baseline_comparison}) reveals a consistent pattern: RemoteSAMsing achieves higher IoU across all classes and datasets, even where detection rates are comparable. This gap is most pronounced for trees (IoU 0.94 vs.\ 0.41--0.62) and crop fields (IoU 0.98 vs.\ 0.65--0.70), where SAM2's segments align closely with semantic object boundaries rather than following spectral gradients. Traditional methods produce segments of uniform size and shape that do not adapt to object morphology; SAM2's foundation model training on over one billion masks enables boundary placement that reflects learned object structure.
+
+SLIC's inability to detect cars (0\% on BSB-1 at 24~cm) highlights a fundamental limitation of fixed-grid superpixels for heterogeneous RS scenes: the uniform grid spacing cannot resolve objects smaller than the superpixel size. Felzenszwalb adapts better to object boundaries but at lower precision (IoU 0.53--0.91 vs.\ 0.79--0.99).
+
+On Potsdam-1, SLIC achieves higher ASA (78.9\%) than RemoteSAMsing (75.8\%). This results from the merge chaining effect (Section~\ref{sec:disc_ground_coverage}): SLIC produces independent, regular superpixels that do not require boundary merge and therefore avoid the chaining problem. Fine-tuning SAM2 on RS data or improving the merge algorithm could close this gap.
 
 \subsection{RemoteSAMsing as a Superpixel Generator for OBIA}
 \label{sec:disc_obia}
