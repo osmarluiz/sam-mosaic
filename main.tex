@@ -265,49 +265,13 @@ Merge & --- & best\_match & Merge strategy (parameter-free) \\
 \subsection{Experimental Design}
 \label{sec:exp_design}
 
-Four experiments evaluate different aspects of RemoteSAMsing.
+The evaluation examines three aspects of RemoteSAMsing: the contribution of each pipeline component to coverage, the effect of point sampling strategy and tile size across scene types, and the quality of the generated segments relative to ground truth.
 
-\subsubsection{Experiment~1: Component ablation}
+Seven configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.86$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Four pipeline variants compare the full RemoteSAMsing configuration against versions with one component disabled: black mask focusing off, adaptive decay off (threshold held at $\tau = 0.86$), and contextual padding off. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes.
 
-To quantify the contribution of each pipeline component, seven configurations are tested on three representative scenes (one per dataset type: BSB-1 for high-resolution urban, Potsdam-1 for ultra-high-resolution urban, and Plant23 for agricultural). Table~\ref{tab:ablation_design} describes each configuration. The three single-pass baselines represent default SAM2 AMG inference at different quality thresholds, without any multi-pass mechanism. The remaining configurations selectively disable individual components from the full pipeline, isolating the marginal contribution of multi-pass iteration, black mask focusing, adaptive threshold decay, and contextual padding.
+Both point strategies (K-means and Dense Grid) are evaluated at three tile sizes ($T \in \{250, 500, 1{,}000\}$) across all seven scenes. $T = 1{,}000$ is selected as a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize while producing tiles that divide evenly into common image dimensions. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively. All scenes are included because the relative performance of each strategy depends on the size distribution of objects in each scene.
 
-\begin{table}[h!]
-\centering
-\caption{Component ablation configurations. Each row describes which pipeline components are active. The baseline (full pipeline) includes all components.}
-\label{tab:ablation_design}
-\begin{tabular}{lccccl}
-\toprule
-Configuration & Multi- & Black & Adaptive & Pad- & Notes \\
- & pass & mask & decay & ding & \\
-\midrule
-Baseline (full) & \checkmark & \checkmark & \checkmark & \checkmark & All components active \\
-Single pass (high) & -- & -- & -- & \checkmark & $\tau_{\text{iou}} = \tau_{\text{stab}} = 0.93$ \\
-Single pass (default) & -- & -- & -- & \checkmark & $\tau_{\text{iou}} = \tau_{\text{stab}} = 0.86$ \\
-Single pass (low) & -- & -- & -- & \checkmark & $\tau_{\text{iou}} = \tau_{\text{stab}} = 0.70$ \\
-No black mask & \checkmark & -- & \checkmark & \checkmark & Black mask disabled \\
-Fixed threshold & \checkmark & \checkmark & -- & \checkmark & $\tau_{\text{iou}} = \tau_{\text{stab}} = 0.86$ \\
-No padding & \checkmark & \checkmark & \checkmark & -- & $p = 0$ pixels \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsubsection{Experiment~2: Point sampling strategy comparison}
-
-As described in Section~\ref{sec:method_points}, K-means concentrates points in the largest residual regions, while Dense Grid maintains uniform density across all unsegmented areas regardless of fragment size. This experiment tests whether these theoretical properties translate into measurable differences in coverage, segment count, and processing time across scene types. Both strategies are evaluated on all seven scenes using the full pipeline with default parameters (Table~\ref{tab:config}). Testing on the complete dataset, rather than a subset, is necessary because the expected advantage of each strategy depends on scene composition: K-means should favor scenes with large homogeneous objects (Plant23), while Dense Grid should favor scenes with many small, scattered objects (Potsdam, Bras\'{i}lia).
-
-\subsubsection{Experiment~3: Tile size sensitivity}
-
-The tile size $T$ controls a fundamental tradeoff: smaller tiles increase the number of tiles quadratically (e.g., $T = 250$ yields $16\times$ more tiles than $T = 1000$ for the same image) but present each object at a proportionally larger relative scale within SAM2's fixed $1{,}024 \times 1{,}024$ internal resolution. A car occupying $40 \times 20$ pixels, for instance, spans roughly 8\% of a $250 \times 250$ tile but less than 0.1\% of a $1{,}000 \times 1{,}000$ tile, potentially falling below SAM2's detection sensitivity at the larger tile size. This experiment varies $T \in \{250, 500, 1{,}000\}$ on three scenes (BSB-1, Potsdam-1, Plant23) to characterize this scale--cost tradeoff across different object size distributions. Both point sampling strategies are tested at each tile size, yielding $3 \times 2 \times 3 = 18$ runs.
-
-\subsubsection{Experiment~4: Segmentation quality assessment}
-
-To evaluate whether the generated segments correspond to real-world objects, each scene with available ground truth (GT) is evaluated against manually digitized polygons with land cover class labels. The BSB-1 scene is evaluated against 10{,}849 manually digitized GT polygons across eight classes (buildings, trees, cars, swimming pools, roads, sports courts, decks, and lakes); unannotated background (42\% of the image) is treated as a separate class for ASA computation. The Potsdam-1 scene uses the publicly available ISPRS semantic labels (six classes: impervious surfaces, buildings, low vegetation, trees, cars, and clutter), from which 1{,}721 object instances are extracted as connected components. \todo{Add Plant23 GT description when available.}
-
-The evaluation follows two complementary protocols. First, \textit{Achievable Segmentation Accuracy} (ASA) \citep{stutz2018superpixels} quantifies global superpixel quality: each SAM segment is assigned the majority GT class label among its pixels, and ASA is the fraction of GT-covered pixels that receive the correct label. This standard superpixel benchmark metric directly answers whether the segments are suitable as input units for OBIA classification. ASA is computed over the GT-covered area only.
-
-Second, an \textit{object-level} protocol evaluates whether individual GT objects are correctly delineated. For each GT polygon, all overlapping SAM segments are identified. A segment qualifies for inclusion if more than 20\% of its total area falls inside the GT polygon; segments below this threshold are excluded as incidental overlap from spatially large segments that extend far beyond the object. The qualifying segments are merged (union) into a single reconstructed object, and metrics are computed between this reconstruction and the GT polygon. This filtering step is necessary because RemoteSAMsing's multi-pass strategy can produce large segments in early passes that cover multiple objects; without filtering, a single segment spanning an entire parking lot would count as a correct detection of every car it overlaps. Sensitivity analysis across thresholds from 5\% to 50\% confirms that results are stable within the 10--30\% range.
-
-Nine pipeline configurations are compared: three AMG single-pass baselines ($\tau \in \{0.93, 0.86, 0.70\}$) and the full RemoteSAMsing pipeline with both point strategies at three tile sizes ($T \in \{250, 500, 1{,}000\}$).
+On BSB-1 and Potsdam-1, segmentation quality is assessed using two protocols. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} measures global superpixel quality by assigning each segment its majority ground truth class. An object-level protocol evaluates individual GT objects: overlapping SAM segments where more than 20\% of the segment area falls inside the GT polygon are merged, and IoU is computed between the merged reconstruction and the GT object. Sensitivity analysis across filtering thresholds from 5\% to 50\% confirms that results are stable within the 10--30\% range. Section~\ref{sec:exp_metrics} defines the resulting metrics.
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
