@@ -307,7 +307,7 @@ Table~\ref{tab:ablation} presents the coverage achieved by each pipeline configu
 
 \begin{table}[h!]
 \centering
-\caption{Component ablation study. Coverage (\%) across three representative scenes. Configuration details are described in Table~\ref{tab:ablation_design}. Avg.\ $\Delta$ indicates the mean coverage difference relative to the baseline.}
+\caption{Component ablation study. Coverage (\%) across three representative scenes. Avg.\ $\Delta$ indicates the mean coverage difference relative to the baseline (full pipeline).}
 \label{tab:ablation}
 \begin{tabular}{lcccc}
 \toprule
@@ -426,7 +426,7 @@ Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 \\
 \end{tabular}
 \end{table}
 
-Fig.~\ref{fig:padding} illustrates the complementary role of contextual padding. Without padding, SAM2 processes each tile without visibility beyond its borders, producing segments that terminate abruptly at tile edges. Even the best-match merge cannot unify these segments because the underlying segmentation does not align across the boundary. With padding, SAM2 sees context beyond the tile edge, producing segments that extend naturally across boundaries and enabling the merge algorithm to unify them into spatially coherent objects.
+Fig.~\ref{fig:padding} illustrates the effect of contextual padding. Without padding, segments terminate at tile edges with different labels on each side of the boundary; the merge algorithm does not unify them. With padding, segments extend across tile edges with consistent labels, and the merge algorithm unifies them.
 
 \begin{figure}[h!]
     \centering
@@ -532,7 +532,7 @@ The average time per tile ranges from 22 to 64~s across scenes. GPU memory usage
 \subsection{Qualitative Analysis}
 \label{sec:res_qualitative}
 
-Fig.~\ref{fig:full_segmentation} presents the full segmentation output for all three datasets, demonstrating that RemoteSAMsing produces spatially consistent, artifact-free results across different sensors, resolutions, and spectral compositions without any model retraining. The BSB-1 scene (8000$\times$8000 pixels, 24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage using the Dense Grid strategy at $T = 250$. Zoom panels A1--A3 reveal that individual buildings, tree canopies, swimming pools, and vehicles are delineated as distinct segments with boundaries that follow real object contours. The Potsdam-1 scene (6000$\times$6000 pixels, 5~cm GSD) achieves 97.1\% coverage with 2{,}388 segments at $T = 1{,}000$, with the higher spatial resolution producing fewer, larger segments per object. The Plant23 scene (10{,}000$\times$10{,}000 pixels, 4.78~m GSD, MNF false-color) reaches 99.4\% coverage with 3{,}530 segments at $T = 250$, confirming that RemoteSAMsing generalizes to non-natural RGB compositions derived from multispectral data.
+Fig.~\ref{fig:full_segmentation} presents the full segmentation output for all three datasets. The BSB-1 scene (8000$\times$8000 pixels, 24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage using the Dense Grid strategy at $T = 250$. Zoom panels A1--A3 show individual buildings, tree canopies, swimming pools, and vehicles delineated as distinct segments. The Potsdam-1 scene (6000$\times$6000 pixels, 5~cm GSD) achieves 97.1\% coverage with 2{,}388 segments at $T = 1{,}000$. The Plant23 scene (10{,}000$\times$10{,}000 pixels, 4.78~m GSD, MNF false-color) reaches 99.4\% coverage with 3{,}530 segments at $T = 250$.
 
 % ============================================================================
 \section{Discussion}
