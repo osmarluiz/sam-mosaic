@@ -1,0 +1,688 @@
+\documentclass[review,11pt]{elsarticle}
+\usepackage[margin=2.5cm]{geometry}
+
+\usepackage{lineno}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\modulolinenumbers[1]
+
+% For tracking TODOs during writing
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+\journal{International Journal of Applied Earth Observation and Geoinformation}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{RemoteSAMsing: Scaling SAM2 to Large Remote Sensing Images via Multi-Pass Adaptive Segmentation}
+
+\author[ee]{Osmar Luiz Ferreira de Carvalho}
+\ead{osmarcarvalho@ieee.org}
+
+\author[geo]{Osmar Ab\'{i}lio de Carvalho J\'{u}nior\corref{cor1}}
+\ead{osmarjr@unb.br}
+
+\author[geo]{Anesmar Olino de Albuquerque}
+\ead{anesmar@ieee.org}
+
+\author[ee]{Daniel Guerreiro e Silva}
+\ead{danielgs@unb.br}
+
+\cortext[cor1]{Corresponding author}
+\address[ee]{Department of Electrical Engineering, University of Bras\'{i}lia, Bras\'{i}lia, Brazil}
+\address[geo]{Department of Geography, University of Bras\'{i}lia, Bras\'{i}lia, Brazil}
+
+\begin{abstract}
+The Segment Anything Model 2 (SAM2) has demonstrated strong zero-shot segmentation capabilities, yet its application to remote sensing (RS) imagery remains constrained by GPU memory limitations that restrict input to small image patches. This paper presents RemoteSAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large RS images through three contributions: (1) a multi-pass segmentation strategy with black mask focusing and adaptive threshold decay that progressively captures increasingly difficult image regions; (2) scene-dependent point sampling strategies, K-means clustering for large homogeneous objects and dense grid placement for small scattered features, that adapt SAM2's automatic mask generation to different RS scenarios; and (3) an efficient $O(n)$ boundary merge algorithm based on lookup tables and Union-Find that eliminates tile boundary artifacts. The evaluation covers seven scenes spanning three sensors (aerial at 5~cm, aerial at 24~cm, and satellite at 4.78~m), two RGB compositions (natural and MNF false-color), and two landscape types (urban and agricultural). Component ablation demonstrates that the full pipeline achieves 89--98\% coverage compared to 30--68\% for vanilla SAM2 single-pass inference. The K-means strategy performs comparably to dense grid on agricultural scenes with large objects, while dense grid provides 1--3 percentage points higher coverage on urban scenes with many small features. Tile size analysis reveals a coverage--speed tradeoff, with smaller tiles (250$\times$250) achieving up to 99\% coverage at the cost of increased processing time. Achievable Segmentation Accuracy (ASA) reaches 76--98\% across three datasets with ground truth (urban at 5--24~cm and agricultural at 4.78~m). Object-level evaluation confirms building detection at 95--96\% (IoU 0.82--0.88), car detection at 81--97\% depending on spatial resolution, agricultural field detection at 95\% (IoU 0.98), and tree detection up to 96\% (IoU 0.94). RemoteSAMsing provides a practical, sensor-agnostic solution for applying foundation model segmentation to large-scale RS image analysis.
+\end{abstract}
+
+\begin{keyword}
+SAM2 \sep remote sensing \sep image segmentation \sep superpixels \sep tiling \sep OBIA \sep foundation models
+\end{keyword}
+
+\end{frontmatter}
+
+\linenumbers
+
+% ============================================================================
+\section{Introduction}
+\label{sec:introduction}
+% ============================================================================
+
+Within the Object-Based Image Analysis (OBIA) paradigm \citep{blaschke2010obia, hay2008geobia, blaschke2014geobia}, image segmentation is a prerequisite for thematic mapping and spatial analysis of remote sensing (RS) data. Segmentation defines the spatial units on which all subsequent classification and analysis operate, and its quality directly affects the accuracy of the final thematic map. The diversity of sensors, spatial resolutions, spectral compositions, and landscape types across RS applications makes collecting training data and building specialized segmentation models for every combination of sensor and scene type impractical \citep{zhu2017deep_rs, ma2019deep_rs}.
+
+Deep learning approaches such as fully convolutional networks \citep{long2015fcn}, U-Net \citep{ronneberger2015unet}, and DeepLabv3+ \citep{chen2018deeplabv3} have advanced RS segmentation \citep{yuan2021segmentation_rs} but still require task-specific training data. Foundation models \citep{bommasani2021foundation, xiao2025foundation_rs} offer an alternative: a single model, trained on large-scale data, that generalizes across domains without task-specific annotation. The Segment Anything Model 2 (SAM2) \citep{ravi2024sam2}, successor to SAM \citep{kirillov2023segment}, segments objects in images given point, box, or mask prompts, and its Automatic Mask Generator (AMG) enables fully unsupervised segmentation by distributing points on a uniform grid and filtering the resulting masks by confidence scores. The RS community has increasingly adopted SAM for tasks including instance segmentation, dataset generation, and zero-shot evaluation on satellite benchmarks \citep{chen2024rsprompter, wang2024samrs, ren2024segment_anything_everywhere, osco2023sam_rs_review}, confirming that SAM's learned representations transfer to overhead imagery despite the domain gap with natural photographs.
+
+This transfer capability makes SAM2 a candidate for general-purpose RS segmentation, but most existing work concentrates on improving per-object segmentation quality (through fine-tuning, prompt engineering, or architectural adaptation) on individual image patches. The segment-geospatial library \citep{wu2023samgeo} is one exception, providing tiling support for large images; however, it processes each tile independently with SAM2's default settings and relies solely on spatial overlap to reduce boundary artifacts, without an explicit merge algorithm or coverage optimization. The end-to-end problem of segmenting a large RS image into a spatially consistent, complete output remains open. Two specific difficulties arise when applying SAM2 to operational RS scenarios.
+
+\textit{Image scale exceeds SAM2's input capacity.} Aerial and satellite sensors produce images that routinely exceed $10{,}000 \times 10{,}000$ pixels, while SAM2 internally resizes all inputs to $1{,}024 \times 1{,}024$. Dividing the image into tiles introduces boundary artifacts: objects that straddle tile edges produce fragmented masks that must be reconciled into a globally consistent segmentation. Contextual padding reduces information loss at tile borders, but no existing approach provides an efficient pixel-level algorithm for merging SAM2 masks across tile boundaries.
+
+\textit{Single-pass inference leaves large portions of the image unsegmented.} SAM2's AMG filters masks by predicted IoU and stability score, discarding low-confidence predictions. On RS images, this single-pass strategy can leave a large fraction of the image area without any mask. Uncovered regions include small objects near the model's resolution limit, texturally complex areas, and zones where the generated mask candidates do not meet the acceptance thresholds.
+
+The problem is compounded by the uniform point grid, which distributes sampling density equally across the image regardless of scene content. RS scenes contain objects spanning several orders of magnitude in size, from agricultural fields covering thousands of pixels to urban features such as vehicles and garden patches occupying tens, and a fixed grid spacing cannot serve both scales. Since OBIA operates on segments rather than individual pixels, unsegmented areas are excluded from all downstream analysis.
+
+This paper presents RemoteSAMsing, an open-source pipeline that addresses both problems to enable SAM2-based unsupervised segmentation of arbitrarily large RS images. Unlike existing approaches that modify the model's architecture or train task-specific prompt generators, RemoteSAMsing operates entirely at inference time with an unmodified SAM2 model. The main contributions are:
+\begin{enumerate}
+    \item A multi-pass segmentation algorithm with black mask focusing and adaptive threshold decay that maximizes image coverage by iteratively targeting unsegmented regions. Ablation experiments quantify the contribution of each component.
+    \item Scene-dependent point sampling strategies (K-means and Dense Grid) that replace the uniform grid with distributions matched to the object size characteristics of different RS scene types. The operator selects the strategy based on scene type, without additional model training.
+    \item A parameter-free boundary merge algorithm using a best-match strategy and Union-Find that reconciles masks across tile boundaries in effectively linear time, producing artifact-free segmentation of arbitrarily large images. Combined with tile-sequential processing, the pipeline maintains constant GPU memory usage regardless of input size.
+\end{enumerate}
+
+The pipeline is evaluated across three sensors, three spatial resolutions (5~cm to 4.78~m), two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural).
+
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews SAM and its adoption in RS, as well as existing approaches for processing large images. Section~\ref{sec:methodology} describes the RemoteSAMsing pipeline. Section~\ref{sec:experiments} details the study areas, implementation, and evaluation metrics. Section~\ref{sec:results} presents the experimental results, Section~\ref{sec:discussion} discusses their implications, and Section~\ref{sec:conclusion} concludes the paper.
+
+
+% ============================================================================
+\section{Related Work}
+\label{sec:related}
+% ============================================================================
+
+\subsection{Segment Anything Model}
+\label{sec:related_sam}
+
+SAM \citep{kirillov2023segment} consists of three components: an image encoder (a Vision Transformer \citep{dosovitskiy2021vit} trained on the SA-1B dataset of over 1 billion masks), a prompt encoder that accepts points, boxes, or masks, and a lightweight mask decoder that outputs multiple candidate masks with predicted IoU scores. The Automatic Mask Generator (AMG) automates the process by placing a regular grid of points across the image, running the decoder at each point, and filtering the resulting masks by two criteria: predicted IoU (the model's estimate of mask quality) and stability score (consistency of the mask under small perturbations of the prediction threshold). Masks that pass both filters are kept; the remainder are discarded. The grid spacing and filter thresholds are the primary parameters controlling the density and quality of the output.
+
+SAM2 \citep{ravi2024sam2} replaces the ViT encoder with a Hiera backbone \citep{ryali2023hiera}, reducing inference time while improving mask quality. It adds a streaming memory architecture for video segmentation but retains the same AMG interface for images. Both models resize inputs to $1{,}024 \times 1{,}024$ pixels internally. On natural images, where subjects typically occupy a large portion of the frame, this resolution is adequate. On RS images, where a single scene may span tens of thousands of pixels and contain objects at multiple scales, the fixed internal resolution forces a tradeoff: processing the full image at once loses fine detail, while processing small crops loses spatial context. Lightweight variants such as EfficientSAM \citep{xiong2024efficientsam} and FastSAM \citep{zhao2023fastsam} reduce computational cost through knowledge distillation or architectural simplification, but they retain the same fixed internal resolution and AMG interface, so the scaling and coverage challenges that arise when processing large RS images apply equally.
+
+Both SAM and SAM2 rely on a uniform point grid for the AMG. The grid spacing determines how many prompt points are placed per image, and consequently which objects have a chance of being detected. This uniform distribution assumes that objects of interest are spread roughly evenly across the image, an assumption that holds for typical natural photographs but not for RS scenes, where object size distributions vary by orders of magnitude across scene types. Despite this limitation, existing SAM-based tools and evaluations consistently use the default uniform grid. No published work, to the best of the authors' knowledge, explores alternative point sampling strategies adapted to the spatial or spectral characteristics of the input scene.
+
+\subsection{SAM in Remote Sensing}
+\label{sec:related_sam_rs}
+
+Recent reviews \citep{osco2023sam_rs_review, wan2025samrs_survey} document the breadth of SAM adoption in RS. Existing work falls along three directions, each addressing a different aspect of the model's application to overhead imagery.
+
+\textit{Architecture adaptation and fine-tuning.} RSPrompter \citep{chen2024rsprompter} keeps SAM's image encoder frozen and trains a lightweight prompt generation network that produces point and box prompts for category-aware instance segmentation. Evaluated on the WHU Building and NWPU VHR-10 benchmarks, it achieves competitive accuracy on individual image patches but does not address large-image processing or measure what fraction of the scene receives a mask. SAMRS \citep{wang2024samrs} uses bounding boxes from existing RS detection datasets (DOTA, DIOR, iSAID) as prompts to SAM, generating a segmentation dataset of 105K images with 1.67M instance masks. As a dataset generation pipeline, SAMRS processes only pre-cropped patches centered on known objects and does not produce exhaustive segmentation of full scenes. SAM-CD \citep{ding2024samcd} adapts SAM's visual encoder for bi-temporal change detection, demonstrating the model's versatility for RS tasks beyond single-image segmentation. Each of these methods targets a specific supervised task on individual patches. Similar domain adaptation efforts have been reported in medical imaging \citep{mazurowski2023sam_medical}, confirming that SAM's zero-shot performance varies across domains.
+
+\textit{Zero-shot evaluation and benchmarking.} \citet{ren2024segment_anything_everywhere} evaluated SAM on overhead imagery across multiple satellite benchmarks, identifying three failure modes specific to RS: spectrally homogeneous objects (e.g., solar panel arrays) that lack internal texture for SAM to anchor on, small objects below the model's effective resolution, and adjacent features with similar spectral signatures where boundary placement is ambiguous. \citet{osco2023sam_rs_review} extended this analysis across UAV, airborne, and satellite scales, reporting performance degradation above 1--2~m ground sampling distance and difficulty with contiguous, hierarchically structured land cover. \citet{li2024sam_cannot} further demonstrated that SAM fails to generalize to natural landscape features such as permafrost landforms, where object boundaries are diffuse and spectrally ambiguous. The same review by \citet{osco2023sam_rs_review} also proposed a one-shot text-prompt method with a looping procedure that extracts the highest-probability object, masks it, and restarts inference, a concept revisited in the summary below.
+
+\textit{Practical tools.} Geo-SAM \citep{zhao2023geosam} is a QGIS plugin that pre-computes SAM image embeddings for geospatial rasters and enables interactive segmentation via user-placed prompts on a map canvas. It supports large images through its embedding cache but requires manual prompting for each object, making exhaustive segmentation impractical for scenes with thousands of features. The segment-geospatial library \citep{wu2023samgeo} wraps SAM for geospatial applications and includes a tiled segmentation mode that divides large images into configurable tiles with optional overlap. Each tile is processed independently using SAM's default uniform point grid, with no multi-pass strategy and no merge algorithm to reconcile masks across tile edges. Coverage completeness is neither measured nor optimized.
+
+Across all three directions, a common pattern emerges: existing work operates on individual image patches and evaluates per-object metrics (average precision, IoU) or per-class accuracy. Although the looping procedure of \citet{osco2023sam_rs_review} is conceptually related to iterative segmentation, it targets single-object extraction via text prompts on individual patches rather than automatic, exhaustive coverage of full scenes. No published work, to the best of the authors' knowledge, addresses coverage completeness, defined as the fraction of the image area that receives a mask, as an explicit optimization objective for large-format RS imagery. \citet{shepherd2019large_scale} proposed an iterative elimination approach for operational large-scale RS segmentation, but it does not use foundation models and requires scene-specific parameterization.
+
+\subsection{Tile Boundary Reconciliation and Coverage}
+\label{sec:related_tiling}
+
+Tiling is standard practice for applying deep learning models to RS images that exceed GPU memory. When applied to SAM, tiling raises two problems beyond the general tiling challenge: reconciling masks across tile boundaries, and maximizing coverage within each tile.
+
+\textit{Boundary reconciliation.} Objects that straddle tile edges produce fragmented masks in adjacent tiles that must be merged into a single consistent segment. Simple overlap between tiles reduces the severity of these artifacts but does not eliminate them, as adjacent tiles may assign different labels to the same spatial region. The SAHI framework \citep{akyon2022sahi} addresses a related problem for object detection: it divides images into overlapping slices, runs detection on each slice, and applies Non-Maximum Suppression across slices to deduplicate detections. SAHI also includes a Spatial Mask Merging mode for instance segmentation, using R-tree spatial indexing and graph clustering to group overlapping masks into unified instances. However, these approaches target instance-level outputs rather than pixel-level exhaustive segmentation and involve multiple tunable parameters.
+
+In traditional (non-SAM-based) RS segmentation, \citet{lassalle2015scalable} proposed a tile-based framework for region-merging algorithms. Their ``stability margin'' concept identifies regions whose merging criterion is determined entirely within a single tile, allowing parallel processing while deferring boundary regions to a global reconciliation step. This guarantees mathematical equivalence with untiled processing, but the method is designed for hierarchical region merging based on spectral similarity and does not extend naturally to the mask-based, non-hierarchical outputs of foundation models such as SAM.
+
+For pixel-level segmentation of large RS images, where the number of segments can reach hundreds of thousands and the output must be a spatially consistent labeled raster, neither SAHI's instance-oriented merge nor Lassalle's region-merging framework provides a direct solution.
+
+\textit{Coverage maximization.} SAM's single-pass AMG produces incomplete coverage on RS tiles: objects that are too small, too texturally complex, or insufficiently sampled by the point grid receive no mask. In natural image applications, uncovered regions are typically background and can be ignored. In RS, every pixel corresponds to a land cover class, and uncovered regions are excluded from all downstream analysis. To the best of the authors' knowledge, no existing work proposes an iterative or multi-pass strategy to close this coverage gap in SAM-based segmentation.
+
+\textit{Relation to traditional superpixel methods.} When coverage is high, the segments produced by SAM-based pipelines function as superpixels: compact, perceptually homogeneous regions that provide a mid-level representation for downstream analysis. Traditional superpixel algorithms \citep{ren2003superpixel} such as SLIC \citep{achanta2012slic} and graph-based methods \citep{felzenszwalb2004efficient} produce exhaustive partitions by design: every pixel is assigned to exactly one superpixel. SAM-based segmentation, by contrast, does not guarantee full coverage, and the resulting segments vary in size from tens to tens of thousands of pixels depending on scene content, far more heterogeneous than the roughly uniform output of SLIC. The quality of superpixel-like segments can be assessed using established benchmarking protocols \citep{stutz2018superpixels} through metrics such as Boundary Recall, Undersegmentation Error, and Achievable Segmentation Accuracy, but these metrics presuppose that segments exist and do not address the prior question of whether the image is fully segmented.
+
+
+% ============================================================================
+\section{Methodology}
+\label{sec:methodology}
+% ============================================================================
+
+RemoteSAMsing addresses two problems. First, SAM2's single-pass inference leaves 30--68\% of RS images unsegmented; Section~\ref{sec:method_multipass} describes the multi-pass algorithm that maximizes coverage within each tile by iteratively targeting residual unsegmented areas. Second, RS images routinely exceed SAM2's $1{,}024 \times 1{,}024$ input capacity; Section~\ref{sec:method_scaling} describes the tiling scheme, boundary merge algorithm, and post-processing that produce a spatially consistent segmentation of arbitrarily large images.
+
+% ----------------------------------------------------------------------------
+\subsection{Multi-Pass Adaptive Segmentation}
+\label{sec:method_multipass}
+% ----------------------------------------------------------------------------
+
+SAM2's Automatic Mask Generator (AMG) processes each input point independently and returns all masks that exceed the quality thresholds in a single forward pass. A single pass with high-quality thresholds captures only the most salient objects, leaving a substantial fraction of the image unsegmented. Lowering the thresholds to compensate introduces noisy, low-quality masks. The multi-pass strategy resolves this tension by iteratively focusing SAM2 on residual unsegmented areas while progressively relaxing quality thresholds only when progress stagnates.
+
+The procedure operates as follows. The first pass distributes a uniform $k \times k$ point grid (default $k = 64$, yielding 4{,}096 points) across the full tile and runs SAM2 at the strictest thresholds ($\tau = 0.93$). Each subsequent pass first applies a black mask to render already-segmented pixels as featureless, then generates new sampling points on the remaining unsegmented area, runs SAM2, and accepts qualifying masks. This continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Three mechanisms work together within this loop: \textit{black mask focusing}, \textit{adaptive threshold decay}, and \textit{per-component mask acceptance}. Algorithm~\ref{alg:multipass} formalizes the complete procedure; each mechanism is described below.
+
+\begin{algorithm}[h!]
+\caption{Multi-pass adaptive segmentation (per tile)}
+\label{alg:multipass}
+\begin{algorithmic}[1]
+\REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, target coverage
+\ENSURE Label map $L$
+\STATE Run SAM2 on $I$ with uniform $k \times k$ point grid at $\tau = \tau_{\text{start}}$
+\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing segments)
+\STATE Compute coverage
+\REPEAT
+    \STATE \textsc{Black Mask}: set segmented pixels to $(0, 0, 0)$ in $I$
+    \STATE \textsc{Point Sampling}: generate points on residual area (K-means or Dense Grid)
+    \STATE Run SAM2 on masked image with new points at threshold $\tau$
+    \STATE Accept qualifying masks, update labels and coverage
+    \IF{coverage $\geq$ target}
+        \STATE \textbf{stop}
+    \ENDIF
+    \IF{coverage gain $< 0.1$ pp}
+        \STATE \textsc{Adaptive Decay}: reduce $\tau$ by $\Delta$
+        \IF{$\tau < \tau_{\text{end}}$}
+            \STATE \textbf{stop}
+        \ENDIF
+    \ENDIF
+\UNTIL{maximum passes reached}
+\RETURN $L$
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{Black mask focusing.} After each pass, all pixels assigned to a segment are set to black $(0, 0, 0)$ in the input image. SAM2 produces few or no mask candidates over uniform black regions, effectively concentrating predictions on the remaining unsegmented areas. Without this mechanism, SAM2 repeatedly generates masks for the same prominent objects across passes, wasting computational budget without increasing coverage. The ablation study (Section~\ref{sec:res_ablation}) quantifies this effect. In principle, setting pixels to $(0,0,0)$ could suppress objects that are naturally very dark; in practice, shadows in optical RS imagery retain non-zero values due to atmospheric scattering, so this collision does not occur at the bit-exact $(0,0,0)$ level.
+
+\textbf{Adaptive threshold decay.} SAM2's AMG filters masks by two quality scores: predicted IoU ($\tau_{\text{iou}}$) and stability ($\tau_{\text{stab}}$). The initial pass uses high thresholds ($\tau_{\text{iou}}^{\text{start}} = \tau_{\text{stab}}^{\text{start}} = 0.93$), corresponding to the upper range of SAM2's internal quality scores where virtually all accepted masks are spatially coherent. When a pass produces no new masks or coverage gain falls below 0.1 percentage points, both thresholds are reduced by $\Delta = 0.01$. This continues until the thresholds reach $\tau^{\text{end}} = 0.60$, below which SAM2 produces predominantly noisy masks. Threshold relaxation occurs only when progress stagnates, preserving mask quality in earlier passes.
+
+\textbf{Mask acceptance criteria.} Each SAM2 mask may contain disconnected regions. The algorithm splits every mask into 4-connected components and evaluates each independently: components smaller than $a_{\min}$ pixels (default 100) are discarded, and components where 50\% or more of the pixels are already covered by existing segments are rejected as redundant. This per-component evaluation prevents a large mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
+
+\textbf{Point sampling strategies.} The first pass uses a uniform grid. For subsequent passes, points must target the residual unsegmented area, which shrinks and fragments as passes accumulate. RemoteSAMsing provides two strategies. \textit{K-means clustering} \citep{arthur2007kmeans} samples up to 10{,}000 coordinates from the residual mask and applies K-means with $k = 64$ clusters; centroids are snapped to valid pixels. The resulting distribution concentrates points in the largest residual areas. \textit{Dense Grid} generates a uniform $k \times k$ grid and discards points on already-segmented pixels. Unlike K-means, Dense Grid maintains uniform density across all residual regions regardless of their size, benefiting scenes with many small scattered objects. Section~\ref{sec:res_strategy} compares both strategies.
+
+Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on three datasets. Each column shows the cumulative segmentation at a different stage, with segments colored by the stage in which they were added (blue: initial pass, orange: intermediate passes, purple: final passes). Coverage increases from 32--57\% after the first pass to 88--98\% at convergence. The rate of progression varies by scene: BSB-1 (24~cm urban) requires 80 passes to reach 88\% coverage, while Potsdam-1 (5~cm urban) and Plant23 (4.78~m agricultural) converge faster due to larger objects relative to tile size.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
+    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number, with markers indicating the stages shown above.}
+    \label{fig:multipass_progression}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\subsection{Scaling to Large Images}
+\label{sec:method_scaling}
+% ----------------------------------------------------------------------------
+
+Remote sensing images routinely exceed tens of thousands of pixels per dimension, while SAM2 internally resizes all inputs to $1{,}024 \times 1{,}024$ pixels. RemoteSAMsing divides the input image into tiles, processes each tile independently with the multi-pass algorithm (Section~\ref{sec:method_multipass}), and unifies the results into a spatially consistent segmentation.
+
+The input image of size $W \times H$ is divided into a regular grid of non-overlapping tiles of size $T \times T$ pixels. Each tile is extracted with an additional contextual padding of $p$ pixels on each side, resulting in an extraction window of $(T + 2p) \times (T + 2p)$ pixels. The padding provides spatial context so that objects straddling tile boundaries are visible to SAM2 during inference. Unlike overlap strategies where predictions from overlapping regions are blended, the padding serves solely as context: only the central $T \times T$ core contributes labels to the output mosaic. The default configuration uses $T = 1{,}000$ and $p = 50$.
+
+Even with padding, tiles are segmented independently, so the same object may receive different labels in adjacent tiles. A merge step produces a spatially consistent label mosaic. For each tile boundary (horizontal and vertical), the algorithm compares labels on adjacent pixels across the boundary and records the contact count for each pair. Rather than merging all touching pairs (which would produce spurious merges between unrelated segments), RemoteSAMsing employs a parameter-free \textit{best-match} strategy: each segment selects the neighbor with the highest contact count, and only these best-match pairs are retained. This approach handles both 1:1 merges (an object split across two tiles) and $N$:1 merges (an object fragmented on one side but whole on the other), while each segment commits to exactly one merge partner.
+
+The merge pairs are processed by a Union-Find structure \citep{tarjan1975union} with path compression, which handles transitive merges implicitly. A lookup table maps each original label to its root, and the entire mosaic is relabeled in a single pass. The total complexity is $O(n \cdot \alpha(n))$, effectively linear in the number of pixels.
+
+After merging, two post-processing operations clean the output. First, small connected components (${<}\,500$ pixels) that are entirely enclosed by a single neighboring segment are absorbed into that neighbor, targeting internal fragments such as shadow patches within buildings. Second, remaining components smaller than 100 pixels are removed. At the resolutions tested (0.05--4.78~m), 100 pixels corresponds to 0.25~m$^2$ (Potsdam) to 2{,}285~m$^2$ (Plant23), well below the size of meaningful landscape features. The final output is a georeferenced raster with integer segment identifiers.
+
+
+% ============================================================================
+\section{Experimental Setup}
+\label{sec:experiments}
+% ============================================================================
+
+\subsection{Study Areas and Datasets}
+\label{sec:exp_data}
+
+The evaluation uses seven scenes from three datasets spanning different sensors, spatial resolutions, spectral compositions, and land cover types (Table~\ref{tab:datasets}).
+
+\begin{table}[h!]
+\centering
+\caption{Overview of datasets used in the experiments. Tile counts refer to the default tile size of $1000 \times 1000$~pixels.}
+\label{tab:datasets}
+\begin{tabular}{llllrrl}
+\toprule
+Dataset & Sensor & Composition & Res.\ (m) & Scenes & Size (px) & Tiles \\
+\midrule
+ISPRS Potsdam & Aerial & RGB natural & 0.05 & 3 & 6{,}000$^2$ & 36 \\
+Bras\'{i}lia & Aerial & RGB natural & 0.24 & 3 & 8{,}000$^2$ & 64 \\
+Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ISPRS Potsdam.} Three image patches (3\_13, 5\_12, 5\_13) from the ISPRS 2D Semantic Labeling Contest over Potsdam, Germany \citep{rottensteiner2014isprs}. The images are true-color RGB aerial orthophotos at 5~cm ground sampling distance, covering a dense European urban landscape with buildings, streets, cars, trees, and low vegetation. Each image is $6{,}000 \times 6{,}000$ pixels, corresponding to $300 \times 300$~m on the ground. This is the only dataset with publicly available semantic ground truth (six land cover classes), used for segmentation quality assessment (Section~\ref{sec:res_quality}).
+
+\textbf{Bras\'{i}lia.} Three crops of $8{,}000 \times 8{,}000$ pixels extracted from a high-resolution aerial survey of Bras\'{i}lia, Brazil, at 24~cm ground sampling distance. The three crops represent distinct urban morphologies: BSB-1 covers a residential area with individual houses, gardens, and narrow streets; BSB-2 covers a commercial district with large buildings, wide avenues, and parking lots; and BSB-3 covers a mixed area with both urban structures and green spaces. At 24~cm resolution, individual cars, sidewalks, and small urban features are clearly visible, resulting in a high density of small objects. Each crop corresponds to approximately $1{,}920 \times 1{,}920$~m on the ground.
+
+\textbf{Plant23.} A single crop of $10{,}000 \times 10{,}000$ pixels from a Planet satellite image \citep{frazier2021planet} over an agricultural region in central Brazil. The image uses a false-color composition derived from Minimum Noise Fraction (MNF) transformation \citep{green1988mnf} of the original multispectral bands, with the three highest signal-to-noise components mapped to RGB. At approximately 4.78~m ground sampling distance, the dominant features are large, spectrally homogeneous agricultural fields (soybean, corn, cotton) interspersed with natural vegetation corridors. This dataset evaluates performance on non-natural RGB compositions that SAM2 was never trained on, as well as on scenes dominated by large objects rather than the small, dense features of urban imagery.
+
+% \begin{figure}[h!]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/study_areas.pdf}
+%     \caption{Study areas and example imagery. (a)~ISPRS Potsdam: dense European urban, true-color RGB at 5~cm. (b)~Bras\'{i}lia: Brazilian urban, true-color RGB at 24~cm. (c)~Plant23: agricultural, MNF false-color at 4.78~m. Note the different object scales: individual cars are visible in Potsdam and Bras\'{i}lia, while Plant23 features span hundreds of pixels.}
+%     \label{fig:study_areas}
+% \end{figure}
+
+\subsection{Implementation Details}
+\label{sec:exp_impl}
+
+All experiments use the SAM2.1 model with the Hiera Large backbone, the largest available checkpoint. The pipeline is implemented in Python~3.12 using PyTorch~2.9 with CUDA~12.8 for GPU inference. All experiments were run on a workstation equipped with an Intel Core i9-14900K CPU, 64~GB of RAM, and an NVIDIA RTX~4090 GPU with 24~GB of VRAM. The default configuration parameters are listed in Table~\ref{tab:config}. The source code is publicly available at \\url{https://github.com/osmarluiz/sam-mosaic}.
+
+\begin{table}[h!]
+\centering
+\caption{Default pipeline configuration parameters.}
+\label{tab:config}
+\begin{tabular}{llrl}
+\toprule
+Module & Parameter & Default & Description \\
+\midrule
+Tiling & $T$ (tile\_size) & 1{,}000 & Tile side length (pixels) \\
+       & $p$ (padding) & 50 & Contextual padding (pixels) \\
+\midrule
+Segmentation & $k$ (points\_per\_side) & 64 & Grid density ($k^2$ points) \\
+             & $t_{\max}$ (max\_passes) & 10 & Maximum passes per tile \\
+             & $\text{cov}_{\text{target}}$ & 99\% & Target coverage \\
+             & $\tau_{\text{iou}}^{\text{start}}$ / $\tau_{\text{iou}}^{\text{end}}$ & 0.93 / 0.60 & IoU threshold range \\
+             & $\tau_{\text{stab}}^{\text{start}}$ / $\tau_{\text{stab}}^{\text{end}}$ & 0.93 / 0.60 & Stability threshold range \\
+             & $\Delta$ (step) & 0.01 & Threshold decay step \\
+\midrule
+Merge & --- & best\_match & Merge strategy (parameter-free) \\
+      & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
+      & merge\_enclosed\_max & 500 & Max.\ area for enclosed absorption \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experimental Design}
+\label{sec:exp_design}
+
+The evaluation examines three aspects of RemoteSAMsing: the contribution of each pipeline component to coverage, the effect of point sampling strategy and tile size across scene types, and the quality of the generated segments relative to ground truth.
+
+Seven configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.86$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Four pipeline variants compare the full RemoteSAMsing configuration against versions with one component disabled: black mask focusing off, adaptive decay off (threshold held at $\tau = 0.86$), and contextual padding off. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes.
+
+Both point strategies (K-means and Dense Grid) are first compared at the default tile size ($T = 1{,}000$) across all seven scenes. The preferred strategy is then evaluated at $T \in \{250, 500, 1{,}000\}$ on three representative scenes. $T = 1{,}000$ is selected as a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively.
+
+On BSB-1, Potsdam-1, and Plant23, segmentation quality is assessed using two protocols. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} measures global superpixel quality by assigning each segment its majority ground truth class. An object-level protocol evaluates individual GT objects: overlapping SAM segments where more than 20\% of the segment area falls inside the GT polygon are merged, and IoU is computed between the merged reconstruction and the GT object. Section~\ref{sec:exp_metrics} defines the resulting metrics.
+
+\subsection{Evaluation Metrics}
+\label{sec:exp_metrics}
+
+\textbf{Coverage} (\%) is the primary metric, defined as the percentage of image pixels assigned to any segment (i.e., non-background). This measures how thoroughly the pipeline segments the image, regardless of individual segment quality.
+
+\textbf{Total segments} is the number of distinct segment labels in the final output after boundary merging and post-processing. This metric reflects the granularity of the segmentation: higher values indicate finer over-segmentation.
+
+\textbf{Processing time} is the total wall-clock time in seconds, including model loading, tile processing, boundary merging, and output saving.
+
+\textbf{Achievable Segmentation Accuracy} (ASA) \citep{stutz2018superpixels} is a standard superpixel quality metric. Each segment is assigned the GT class label that covers the majority of its pixels within the GT-annotated area. ASA is the fraction of GT pixels whose segment received the correct class label. An ASA of 100\% means every segment lies entirely within a single GT class; lower values indicate segments that cross class boundaries. ASA is reported globally and per class.
+
+Following established object-based evaluation protocols \citep{clinton2010segmentation_eval}, the object-level protocol produces three metrics. \textbf{Detection rate} (\%) is the proportion of GT objects for which at least one qualifying SAM segment exists (i.e., a segment with more than 20\% of its area inside the GT polygon). Objects covered exclusively by non-qualifying segments (large segments that extend far beyond the object boundaries) are classified as \textit{giant-covered} rather than detected; objects with no overlapping segment at all are classified as \textit{missed}. \textbf{Object IoU} is the intersection-over-union between the merged qualifying segments and the GT polygon, computed only for detected objects. \textbf{Mean segments per object} ($\bar{n}$) quantifies the degree of over-segmentation: a building reconstructed from five roof and shadow segments has $\bar{n} = 5$.
+
+% ============================================================================
+\section{Results}
+\label{sec:results}
+% ============================================================================
+
+Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth, providing a visual overview of the results quantified in the following subsections. BSB-1 (24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage, Potsdam-1 (5~cm GSD) into 2{,}388 segments at 97.1\%, and Plant23 (4.78~m GSD, MNF false-color) into 3{,}530 segments at 99.4\%.
+
+The evaluation proceeds in three stages. Section~\ref{sec:res_config} identifies the optimal pipeline configuration through component ablation, point strategy comparison, and tile size analysis. Section~\ref{sec:res_merge} validates the boundary merge algorithm. Section~\ref{sec:res_quality} evaluates segmentation quality at the resulting best configuration per dataset against ground truth and traditional baselines.
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig2_full_segmentation.png}
+    \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 1{,}000$, 3{,}530 segments, 99.4\% coverage). Segment colors are assigned randomly for visualization.}
+    \label{fig:full_segmentation}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\subsection{Pipeline Configuration Analysis}
+\label{sec:res_config}
+% ----------------------------------------------------------------------------
+
+\subsubsection{Component Contributions}
+\label{sec:res_ablation}
+
+Table~\ref{tab:ablation} presents coverage and processing time for seven pipeline configurations on three representative scenes. All configurations use K-means with $T = 1{,}000$ as a controlled reference; the point strategy and tile size are varied in the following subsections.
+
+\begin{table}[h!]
+\centering
+\caption{Component ablation: coverage (\%) and processing time (seconds) across three scenes. All configurations use K-means, $T = 1{,}000$. Avg.\ $\Delta$ is the mean coverage difference relative to the full pipeline.}
+\label{tab:ablation}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{BSB-1 (24~cm)} & \multicolumn{2}{c}{Potsdam-1 (5~cm)} & \multicolumn{2}{c}{Plant23 (4.78~m)} & \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Configuration & Cov. & Time & Cov. & Time & Cov. & Time & $\overline{\Delta}$ \\
+\midrule
+\textbf{Full pipeline} & \textbf{89.0} & 2{,}293 & \textbf{97.7} & 564 & \textbf{97.7} & 1{,}137 & --- \\
+Single pass ($\tau = 0.93$) & 30.1 & 320 & 36.5 & 160 & 68.5 & 487 & $-$49.8 \\
+Single pass ($\tau = 0.86$) & 58.5 & 509 & 67.4 & 208 & 84.4 & 581 & $-$24.7 \\
+Single pass ($\tau = 0.70$) & 77.0 & 829 & 86.1 & 313 & 93.4 & 829 & $-$9.3 \\
+No black mask & 78.3 & 2{,}614 & 86.6 & 901 & 93.8 & 1{,}857 & $-$8.6 \\
+Fixed threshold ($\tau = 0.86$) & 66.6 & 621 & 82.9 & 249 & 93.4 & 665 & $-$13.9 \\
+No padding & 89.8 & 2{,}046 & 96.8 & 494 & 97.2 & 980 & $-$0.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The full pipeline achieves 89--98\% coverage, compared to 30--68\% for single-pass SAM2 at the highest quality threshold ($\tau = 0.93$). Even at the most permissive threshold ($\tau = 0.70$), single-pass coverage reaches only 77--93\%, confirming that multi-pass processing is essential for high coverage.
+
+Adaptive threshold decay is the largest single contributor, adding 13.9~pp on average. Fixing the threshold at $\tau = 0.86$ prevents the pipeline from accessing the higher-quality masks available at $\tau = 0.93$ during initial passes and the additional coverage available below $\tau = 0.86$ in later passes.
+
+The black mask adds 8.6~pp on average and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions, producing 27\% more segments (14{,}767 vs.\ 11{,}624 on BSB-1) without coverage progress.
+
+Contextual padding contributes less than 1~pp to coverage; its primary effect is on boundary quality, evaluated in Section~\ref{sec:res_merge}. The full pipeline requires $3$--$7\times$ more processing time than single-pass inference, reflecting the iterative multi-pass computation.
+
+\subsubsection{Point Sampling Strategy}
+\label{sec:res_strategy}
+
+Table~\ref{tab:strategy} compares K-means and Dense Grid across all seven scenes at $T = 1{,}000$.
+
+\begin{table}[h!]
+\centering
+\caption{Point sampling strategy comparison at $T = 1{,}000$. Best coverage per scene in bold. $\Delta$ = Dense Grid $-$ K-means.}
+\label{tab:strategy}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{Coverage (\%)} & & \multicolumn{2}{c}{Segments} \\
+\cmidrule(lr){2-3} \cmidrule(lr){5-6}
+Scene & K-means & Dense & $\Delta$ & K-means & Dense \\
+\midrule
+Potsdam-1 & \textbf{97.7} & 96.7 & $-$1.0 & 1{,}979 & 2{,}226 \\
+Potsdam-2 & 97.4 & \textbf{97.7} & +0.4 & 2{,}946 & 3{,}163 \\
+Potsdam-3 & \textbf{98.0} & 97.4 & $-$0.6 & 2{,}331 & 2{,}567 \\
+BSB-1 & 89.0 & \textbf{90.0} & +1.0 & 12{,}043 & 12{,}653 \\
+BSB-2 & 91.0 & \textbf{92.7} & +1.8 & 11{,}062 & 11{,}503 \\
+BSB-3 & 89.8 & \textbf{92.5} & +2.7 & 10{,}093 & 11{,}018 \\
+Plant23 & 97.7 & \textbf{97.8} & +0.1 & 4{,}141 & 4{,}289 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Dense Grid outperforms K-means on all three Bras\'{i}lia scenes (+1.0 to +2.7~pp) and produces 4--13\% more segments, providing finer granularity. On Potsdam and Plant23, both strategies achieve similar coverage. Dense Grid maintains uniform point density across all residual fragments regardless of their size, while K-means concentrates centroids in the largest residual areas, potentially leaving small isolated patches without prompt points.
+
+Having established Dense Grid as the preferred strategy, the following tile size analysis adopts it for all runs.
+
+\subsubsection{Tile Size}
+\label{sec:res_tilesize}
+
+Table~\ref{tab:tilesize} shows the effect of tile size on coverage, Achievable Segmentation Accuracy (ASA), and processing time using Dense Grid.
+
+\begin{table}[h!]
+\centering
+\caption{Effect of tile size on coverage, ASA, and processing time (Dense Grid). Best coverage per scene in bold.}
+\label{tab:tilesize}
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{Coverage (\%)} & \multicolumn{3}{c}{ASA (\%)} & \multicolumn{3}{c}{Time (s)} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+Scene & 250 & 500 & 1000 & 250 & 500 & 1000 & 250 & 500 & 1000 \\
+\midrule
+BSB-1 & \textbf{97.4} & 95.5 & 90.9 & 88.1 & \textbf{90.1} & 86.2 & 50{,}161 & 16{,}815 & 5{,}691 \\
+Potsdam-1 & \textbf{99.1} & 98.6 & 96.6 & 46.0$^*$ & 60.4$^*$ & \textbf{75.8} & 8{,}639 & 4{,}474 & 1{,}409 \\
+Plant23 & \textbf{99.1} & 98.7 & 97.8 & 78.7$^*$ & 88.1$^*$ & \textbf{98.0} & 14{,}111 & 4{,}404 & 1{,}664 \\
+\bottomrule
+\multicolumn{10}{l}{\footnotesize $^*$ASA degraded by merge chaining at small tile sizes (see text).}
+\end{tabular}
+\end{table}
+
+Reducing $T$ from 1{,}000 to 250 increases coverage by 1--7~pp across datasets, at the cost of $9\times$ longer processing time due to the $16\times$ increase in tile count.
+
+ASA degrades at smaller tile sizes on Potsdam-1 (75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$) and Plant23 (98.0\% to 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. SAM2 segments the entire tile as one object, and the merge algorithm chains these single-segment tiles transitively into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with multiple objects per tile.
+
+Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection in BSB-1. At $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas. At $T = 250$, 91\% of the 259 cars in this crop are correctly detected with segment-to-object ratios below $3\times$.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig4_tilesize.png}
+    \caption{Effect of tile size on small object detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car evaluation. Green: correctly delineated (segment-to-car ratio $< 3\times$). Yellow: mild under-segmentation ($3$--$10\times$). Red: severe under-segmentation ($> 10\times$). Gray: missed (no overlapping segment).}
+    \label{fig:tilesize_cars}
+\end{figure}
+
+Based on these coverage and ASA tradeoffs, the subsequent quality evaluation (Section~\ref{sec:res_quality}) uses Dense Grid with $T = 250$ for BSB-1 (maximizing small-object detection at 24~cm GSD) and Dense Grid with $T = 1{,}000$ for Potsdam-1 and Plant23 (avoiding merge chaining).
+
+% ----------------------------------------------------------------------------
+\subsection{Boundary Merge}
+\label{sec:res_merge}
+% ----------------------------------------------------------------------------
+
+Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The naive baseline merges all segment pairs sharing contact across a tile boundary, propagating merges transitively through Union-Find. In the BSB-1 example, multiple buildings and vegetation areas are fused into a single segment spanning the tile corner. In the Potsdam-1 example, 83\% of the crop becomes a single mega-segment. The best-match strategy requires each segment to commit to exactly one merge partner, the neighbor with the highest contact area, avoiding these spurious fusions.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig5_merge.png}
+    \caption{Boundary merge comparison across three datasets. Each row shows a crop centered on a tile boundary (red dashed lines). Before merge: independent per-tile segments with different labels on each side. Naive merge: all touching segments are merged transitively, creating spurious mega-segments. Best-match merge: each segment merges only with its highest-contact neighbor, preserving object identity.}
+    \label{fig:merge}
+\end{figure}
+
+Table~\ref{tab:merge_strategy} quantifies this across all scenes. Best-match merge produces 15--20\% fewer merges than naive, preserving 5--10\% more distinct segments.
+
+\begin{table}[h!]
+\centering
+\caption{Boundary merge comparison (Dense Grid, $T = 1{,}000$). Coverage is identical; segment count and merge count differ.}
+\label{tab:merge_strategy}
+\begin{tabular}{lrrrrr}
+\toprule
+ & \multicolumn{2}{c}{Naive} & \multicolumn{2}{c}{Best-match} & \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+Scene & Seg. & Merges & Seg. & Merges & $\Delta$Seg \\
+\midrule
+Potsdam-1 & 1{,}999 & 751 & 2{,}129 & 602 & +130 \\
+Potsdam-2 & 2{,}913 & 842 & 3{,}034 & 703 & +121 \\
+Potsdam-3 & 2{,}389 & 668 & 2{,}482 & 554 & +93 \\
+BSB-1     & 11{,}844 & 2{,}250 & 12{,}162 & 1{,}903 & +318 \\
+BSB-2     & 10{,}584 & 2{,}425 & 10{,}985 & 1{,}994 & +401 \\
+BSB-3     & 10{,}197 & 2{,}242 & 10{,}535 & 1{,}867 & +338 \\
+Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 & +150 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary segmentation. Without padding, segments terminate at tile edges with different labels on each side; the merge algorithm cannot unify them. With padding, objects are segmented continuously across tile edges, enabling correct merges.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig6_padding.png}
+    \caption{Effect of contextual padding on boundary segmentation. Colored segments are affected by the tile boundary (red dashed line); gray segments are unaffected. Without padding, segments terminate at the boundary, creating visible discontinuities. With padding, the same objects are segmented continuously across tile edges.}
+    \label{fig:padding}
+\end{figure}
+
+All quality results in Section~\ref{sec:res_quality} use the best-match merge with contextual padding.
+
+% ----------------------------------------------------------------------------
+\subsection{Segmentation Quality}
+\label{sec:res_quality}
+% ----------------------------------------------------------------------------
+
+This section evaluates the final output at the recommended configurations determined in Section~\ref{sec:res_config}: Dense Grid $T = 250$ for BSB-1 and Dense Grid $T = 1{,}000$ for Potsdam-1 and Plant23. RemoteSAMsing covers 88--98\% of image pixels; the remaining 2--12\% are penalized as background (``Other'' class) in ASA computation and as missed objects in per-object evaluation. SLIC and Felzenszwalb cover 100\% of pixels by design.
+
+Table~\ref{tab:perobject} presents per-class detection rate, IoU, ASA, and mean segments per object ($\bar{n}$) for RemoteSAMsing on all evaluated classes.
+
+\begin{table}[h!]
+\centering
+\caption{RemoteSAMsing per-class evaluation. Best configuration per dataset: BSB-1 Dense Grid $T = 250$ (27{,}427 segments), Potsdam-1 Dense Grid $T = 1{,}000$ (2{,}388 segments), Plant23 Dense Grid $T = 1{,}000$ (3{,}530 segments). Segment filter $> 20$\%.}
+\label{tab:perobject}
+\begin{tabular}{llrrrrr}
+\toprule
+Dataset & Class & $n$ & Det.\ (\%) & IoU & ASA (\%) & $\bar{n}$ \\
+\midrule
+\multirow{9}{*}{BSB-1} & Buildings   & 2{,}055 & 94.7 & 0.82 & 92.3 & 2.8 \\
+ & Trees       & 5{,}440 & 95.7 & 0.94 & 95.5 & 1.1 \\
+ & Cars        & 1{,}717 & 81.3 & 0.79 & 78.6 & 1.0 \\
+ & Pools       & 1{,}154 & 86.9 & 0.73 & 65.2 & 1.1 \\
+ & Roads       &      68 & 57.4 & 0.60 & 84.3 & 30.1 \\
+ & Courts      &      53 & 100  & 0.75 & 78.8 & 1.3 \\
+ & Lakes       &       9 & 100  & 0.78 & 99.4 & 3.1 \\
+ & Decks       &      10 & 80.0 & 0.84 & 88.7 & 1.0 \\
+\cmidrule(lr){2-7}
+ & \textit{Global} & \textit{10{,}506} & \textit{91.9} & \textit{0.87} & \textit{90.1} & --- \\
+\midrule
+\multirow{7}{*}{Potsdam-1} & Buildings   &      78 & 96.2 & 0.88 & 96.5 & 9.2 \\
+ & Cars        &     257 & 96.9 & 0.83 & 89.0 & 1.0 \\
+ & Trees       &     280 & 67.1 & 0.47 & 56.1 & 2.9 \\
+ & Low veg.    &     396 & 50.5 & 0.52 & 76.3 & 2.5 \\
+ & Impervious  &     103 & 56.3 & 0.52 & 74.7 & 8.7 \\
+ & Clutter     &     279 & 71.7 & 0.61 & 49.3 & 1.6 \\
+\cmidrule(lr){2-7}
+ & \textit{Global} & \textit{1{,}393} & \textit{69.6} & \textit{0.61} & \textit{75.8} & --- \\
+\midrule
+\multirow{4}{*}{Plant23} & Pivot irrig. &    508 & 100  & 0.99 & 99.7 & 1.0 \\
+ & Crop fields & 2{,}758 & 94.6 & 0.98 & 95.4 & 1.0 \\
+ & Lakes       &      73 & 89.0 & 0.95 & 91.9 & 1.3 \\
+\cmidrule(lr){2-7}
+ & \textit{Global} & \textit{3{,}339} & \textit{95.3} & \textit{0.98} & \textit{98.0} & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Objects with well-defined shape and spectral contrast achieve high detection rates and IoU. Buildings (94.7--96.2\% detection, IoU 0.82--0.88), cars (81.3--96.9\%, IoU 0.79--0.83), agricultural fields (94.6--100\%, IoU 0.98--0.99), and trees with distinct canopies (95.7\% on BSB-1, IoU 0.94) are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On BSB-1, tile size is the primary lever for small-object detection: car detection increases from 40.9\% at $T = 1{,}000$ to 81.3\% at $T = 250$ (Fig.~\ref{fig:tilesize_cars}).
+
+Amorphous and elongated features are more challenging. Roads achieve 57.4\% detection with $\bar{n} = 30.1$, as these elongated structures span multiple tiles and are fragmented by the tile-based approach. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) lack distinct spectral or spatial boundaries for SAM2 to anchor on.
+
+On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99, and crop fields reach 94.6\% with IoU 0.98, despite the MNF false-color composition that differs substantially from SAM2's natural-image training data.
+
+Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic} and Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}. SLIC is configured with $n_\text{segments}$ matched to RemoteSAMsing; Felzenszwalb scale is calibrated to produce the closest achievable segment count (see caption for parameters and actual counts).
+
+\begin{table}[h!]
+\centering
+\caption{Baseline comparison. Det.\ = detection rate (\%), IoU = mean object IoU for detected objects, $\bar{n}$ = mean segments per detected object. ASA = global Achievable Segmentation Accuracy (\%). Best IoU per class in bold. SLIC: compactness = 10. Felzenszwalb: $\sigma = 0.5$, min\_size = 50. Segment counts: BSB-1 SLIC 18{,}368 / Felz 24{,}410 / RS 27{,}427; Potsdam-1 SLIC 1{,}995 / Felz 3{,}376 / RS 2{,}388; Plant23 SLIC 2{,}263 / Felz 5{,}810 / RS 3{,}530.}
+\label{tab:baselines}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+ & & \multicolumn{2}{c}{SLIC} & \multicolumn{3}{c}{Felzenszwalb} & \multicolumn{3}{c}{RemoteSAMsing} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+Dataset & Class & Det. & IoU & Det. & IoU & $\bar{n}$ & Det. & IoU & $\bar{n}$ \\
+\midrule
+\multirow{4}{*}{BSB-1} & Buildings & 69.5 & 0.70 & 83.9 & 0.51 & 3.7 & 94.7 & \textbf{0.82} & 2.8 \\
+ & Trees     & 50.9 & 0.61 & 43.8 & 0.21 & 1.8 & 95.7 & \textbf{0.94} & 1.1 \\
+ & Cars      &  0.0 & ---  & 61.6 & 0.57 & 1.0 & 81.3 & \textbf{0.79} & 1.0 \\
+ & Pools     & 22.0 & 0.51 & 70.7 & 0.46 & 1.2 & 86.9 & \textbf{0.73} & 1.1 \\
+\cmidrule(lr){2-10}
+ & ASA       & \multicolumn{2}{c}{80.8} & \multicolumn{3}{c}{57.4} & \multicolumn{3}{c}{\textbf{90.1}} \\
+\midrule
+\multirow{3}{*}{Potsdam-1} & Buildings & 85.9 & 0.75 & 85.9 & 0.20 & 23.6 & 96.2 & \textbf{0.88} & 9.2 \\
+ & Cars      &  3.5 & 0.51 & 72.8 & 0.42 & 1.5 & 96.9 & \textbf{0.83} & 1.0 \\
+ & Trees     & 60.4 & 0.55 & 42.1 & 0.03 & 6.2 & 67.1 & \textbf{0.47} & 2.9 \\
+\cmidrule(lr){2-10}
+ & ASA       & \multicolumn{2}{c}{\textbf{78.9}} & \multicolumn{3}{c}{29.9} & \multicolumn{3}{c}{75.8} \\
+\midrule
+\multirow{3}{*}{Plant23} & Pivots & 82.1 & 0.79 & 67.9 & 0.29 & 2.2 & 100 & \textbf{0.99} & 1.0 \\
+ & Crops     & 25.1 & 0.70 & 50.0 & 0.18 & 2.0 & 94.6 & \textbf{0.98} & 1.0 \\
+\cmidrule(lr){2-10}
+ & ASA       & \multicolumn{2}{c}{86.6} & \multicolumn{3}{c}{62.7} & \multicolumn{3}{c}{\textbf{98.0}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+RemoteSAMsing achieves the highest IoU on all 9 compared classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18). SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating that detected objects are poorly delineated; on Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction.
+
+On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%). This results from the merge chaining effect described in Section~\ref{sec:res_tilesize}: SLIC produces independent superpixels without tile boundary artifacts. Per-class metrics show RemoteSAMsing outperforms SLIC on every class (building IoU 0.88 vs.\ 0.75, car IoU 0.83 vs.\ 0.51).
+
+Processing time differs substantially across methods: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 1{,}400--5{,}700~s at $T = 1{,}000$ (up to 50{,}000~s at $T = 250$). Per-tile processing time ranges from 22 to 64~s, and GPU memory usage remains constant regardless of image size.
+
+Across all three datasets spanning 5~cm to 4.78~m GSD, RemoteSAMsing achieves the highest per-object IoU on every evaluated class while maintaining 76--98\% global ASA.
+
+% ============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% ============================================================================
+
+\subsection{Role of Each Pipeline Component}
+\label{sec:disc_components}
+
+The ablation study reveals a clear hierarchy of component importance. The multi-pass mechanism combined with black mask focusing is the most impactful innovation, bridging the gap from 30--68\% (single-pass SAM2) to 78--94\% coverage. Without the black mask, the multi-pass loop fails to increase coverage because SAM2 repeatedly attends to the same prominent objects. The black mask redirects attention to residual areas by rendering covered pixels as featureless black, forcing the model to generate masks for progressively harder regions.
+
+Adaptive threshold decay provides the second-largest contribution, adding 4--22~pp over fixed-threshold multi-pass. The key insight is that threshold relaxation should be \textit{conditional}: thresholds are reduced only when a pass produces no new masks or coverage gain falls below 0.1\%. This preserves high-quality masks in early passes while still reaching difficult regions in later passes. A fixed low threshold from the start would capture more area per pass but at the cost of noisier, lower-quality segments.
+
+Contextual padding has the smallest measurable effect on coverage ($<$1~pp) but serves a different purpose: it ensures that objects straddling tile boundaries are segmented with full spatial context, improving boundary quality in ways that the coverage metric does not capture. The observation that BSB-1 achieves slightly \textit{higher} coverage without padding is likely an artifact of the smaller effective tile area at image edges being easier to saturate; the resulting segments at boundaries are of lower quality upon visual inspection.
+
+\subsection{Scene-Dependent Point Sampling}
+\label{sec:disc_strategy}
+
+The strategy comparison reveals that the relative benefit of Dense Grid over K-means is governed by the ratio of object size to tile size. In Bras\'{i}lia at 24~cm resolution, small urban objects (cars, narrow pathways) occupy tens to hundreds of pixels within a $1{,}000 \times 1{,}000$ tile. As the multi-pass algorithm progresses and the residual area fragments into many small disconnected patches, K-means concentrates its 64 centroids in the largest patches, leaving smaller fragments without prompt points. Dense Grid maintains uniform coverage regardless of fragment size, ensuring each isolated patch receives at least one prompt.
+
+At Potsdam's 5~cm resolution, even small objects span thousands of pixels, making them large enough for K-means centroids. The two strategies therefore perform similarly. For Plant23, where fields span tens of thousands of pixels, both strategies are equivalent.
+
+As a working hypothesis, Dense Grid becomes advantageous when the smallest objects of interest occupy less than approximately $1/k^2$ of the tile area (where $k$ is the grid density), because it guarantees at least one prompt point per grid cell regardless of residual fragmentation. Systematic validation of this threshold across a wider range of scenes remains for future work.
+
+\subsection{Tile Size as an Implicit Scale Parameter}
+\label{sec:disc_tilesize}
+
+The tile size experiment reveals that $T$ functions as an implicit scale parameter that determines the effective resolution at which SAM2 processes objects. Since SAM2 internally resizes all inputs to $1{,}024 \times 1{,}024$ pixels, a $250 \times 250$ tile is upscaled by $4\times$ compared to a $1{,}000 \times 1{,}000$ tile. This upscaling magnifies small features in the model's feature space, enabling detection of objects that would be too small to activate at the original scale.
+
+The largest improvement occurs on BSB-1, where coverage increases from 90.89\% ($T = 1{,}000$) to 97.41\% ($T = 250$). Tile size also affects object-level quality: on BSB-1, car IoU improves from 0.66 ($T = 1{,}000$) to 0.79 ($T = 250$), and tree IoU from 0.80 to 0.94. This indicates that the low detection rates at $T = 1{,}000$ result from a scale mismatch rather than a fundamental limitation of SAM2: small urban objects fall below SAM2's effective detection threshold at the larger tile size but are detected when presented at higher relative scale.
+
+An interesting tradeoff emerges between ASA and per-object detection on BSB-1. ASA peaks at $T = 500$ (90.1\%) while per-object detection rates are highest at $T = 250$. Smaller tiles produce segments that are tighter to individual objects but extend further into surrounding background, increasing the fraction of misclassified boundary pixels. The optimal tile size therefore depends on the downstream application: $T = 500$ maximizes pixel-level classification accuracy, while $T = 250$ maximizes object detection completeness.
+
+This finding motivates a potential hierarchical multi-scale approach: an initial coarse pass at $T = 1{,}000$ followed by a targeted fine pass at $T = 250$ applied only to residual unsegmented areas, which could achieve near-complete coverage at reduced computational cost.
+
+\subsection{Minimum Ground Coverage per Tile}
+\label{sec:disc_ground_coverage}
+
+On Potsdam-1 (5~cm GSD) and Plant23 (4.78~m GSD), reducing tile size below $T = 1{,}000$ degrades segmentation quality rather than improving it. At $T = 250$ on Potsdam-1, the largest merged segment covers 70.4\% of the image and ASA drops from 75.8\% to 46.0\%. The same pattern occurs on Plant23, where ASA drops from 98.0\% to 78.7\%.
+
+The degradation arises because tiles that cover too little ground area contain insufficient object diversity. At 5~cm GSD, a $250 \times 250$ tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface (one rooftop, one grass patch). SAM2 segments the entire tile as one object. The merge algorithm then chains these single-segment tiles transitively through Union-Find, creating mega-segments that span the image. At 4.78~m GSD, a $250 \times 250$ tile covers $1{,}194 \times 1{,}194$~m; although the ground area per tile is large, individual agricultural fields span multiple tiles and produce single-segment tiles that chain through the merge algorithm.
+
+BSB-1 at 24~cm GSD does not exhibit this problem because $T = 250$ covers $60 \times 60$~m, large enough to contain multiple objects per tile. Across the three datasets, tile configurations covering approximately 50~m or more per side produce stable results. This is a limitation of the merge algorithm, not of SAM2: the per-tile segmentation before merge is correct, but the boundary-contact-based merge cannot distinguish legitimate from spurious merges when tiles are dominated by a single segment. An improved merge algorithm incorporating spectral or textural similarity could mitigate this effect.
+
+\subsection{Sensor and Composition Agnosticism}
+\label{sec:disc_sensor}
+
+RemoteSAMsing achieves high coverage (97.7--99.4\%) and ASA of 98.0\% on Plant23 despite its MNF false-color composition, an RGB rendering derived from statistical transformations of multispectral bands that bears no resemblance to the natural images in SAM2's training data. Pivot irrigation fields are detected at 100\% with IoU 0.99, and crop fields at 94.6\% with IoU 0.98. This is consistent with the hypothesis that SAM2's learned representations respond primarily to spatial gradients and textural boundaries rather than to the spectral meaning of the RGB channels. If this generalizes beyond MNF composites, remote sensing practitioners could compose any three informative bands into an RGB image and obtain meaningful segments, provided there is sufficient spatial contrast between objects.
+
+\subsection{Comparison with Traditional Segmentation Methods}
+\label{sec:disc_baselines}
+
+The comparison with SLIC and Felzenszwalb (Table~\ref{tab:baseline_comparison}) reveals a consistent pattern: RemoteSAMsing achieves higher IoU across all classes and datasets, even where detection rates are comparable. This gap is most pronounced for trees (IoU 0.94 vs.\ 0.41--0.62) and crop fields (IoU 0.98 vs.\ 0.65--0.70), where SAM2's segments align closely with semantic object boundaries rather than following spectral gradients. Traditional methods produce segments of uniform size and shape that do not adapt to object morphology; SAM2's foundation model training on over one billion masks enables boundary placement that reflects learned object structure.
+
+SLIC's inability to detect cars (0\% on BSB-1 at 24~cm) highlights a fundamental limitation of fixed-grid superpixels for heterogeneous RS scenes: the uniform grid spacing cannot resolve objects smaller than the superpixel size. Felzenszwalb adapts better to object boundaries but at lower precision (IoU 0.53--0.91 vs.\ 0.79--0.99).
+
+On Potsdam-1, SLIC achieves higher ASA (78.9\%) than RemoteSAMsing (75.8\%). This results from the merge chaining effect (Section~\ref{sec:disc_ground_coverage}): SLIC produces independent, regular superpixels that do not require boundary merge and therefore avoid the chaining problem. Fine-tuning SAM2 on RS data or improving the merge algorithm could close this gap.
+
+\subsection{RemoteSAMsing as a Superpixel Generator for OBIA}
+\label{sec:disc_obia}
+
+RemoteSAMsing produces over-segmentation by design: a single building may be split into roof, shadow, and facade segments, while an agricultural field may be divided along subtle spectral gradients. This is consistent with the superpixel paradigm in Object-Based Image Analysis (OBIA), where over-segmentation is preferred over under-segmentation because segments can be merged in downstream classification but cannot be split \citep{blaschke2010obia, benz2004ecognition, baatz2000multiresolution}.
+
+Under this paradigm, a building roof divided into two segments is not an error provided neither segment leaks into adjacent objects and both are correctly classifiable as ``building'' in downstream analysis.
+
+The ASA metric \citep{stutz2018superpixels} provides a direct quantitative test of this suitability. RemoteSAMsing achieves ASA of 90.1\% on BSB-1, 75.8\% on Potsdam-1, and 98.0\% on Plant23, meaning that a downstream classifier assigning each segment its majority ground truth class can achieve 76--98\% accuracy without additional refinement. The object-level evaluation confirms that buildings are detected at 94.7\% (BSB-1) and 96.2\% (Potsdam-1) with IoU of 0.82 and 0.88, respectively. Agricultural fields achieve 94.6\% detection with IoU of 0.98 on Plant23, and pivot irrigation fields reach 100\% detection with IoU of 0.99. These results, consistent across three datasets with different ground truth sources, spatial resolutions, and landscape types, indicate that RemoteSAMsing segments are suitable as input units for OBIA classification pipelines.
+
+Compared to traditional superpixel methods such as SLIC \citep{achanta2012slic}, RemoteSAMsing offers a key advantage: the segments are generated by a foundation model trained on over one billion natural image masks, giving them semantic awareness that purely spectral/spatial methods lack. SAM2 tends to produce boundaries that align with semantically meaningful edges (e.g., object contours) rather than arbitrary spectral gradients, potentially improving downstream classification performance.
+
+\subsection{Limitations}
+\label{sec:disc_limitations}
+
+Several limitations warrant discussion.
+
+\textit{SAM2's training domain.} SAM2 was trained exclusively on natural images and may produce suboptimal segments for data modalities far from its training distribution (e.g., SAR, thermal, hyperspectral). While the Plant23 results with MNF false-color suggest tolerance to non-natural compositions, the model's performance on truly exotic data remains untested.
+
+\textit{No semantic output.} RemoteSAMsing produces instance-agnostic segments without class labels. Downstream classification (e.g., random forest on segment-level features) is required to produce thematic maps. This is inherent to SAM2's design as a class-agnostic segmentation model.
+
+\textit{Small object delineation.} Cars achieve 81.3\% object detection at $T = 250$ on BSB-1, with the remaining 18.5\% covered exclusively by segments that extend far beyond the car footprint. At 24~cm GSD, a typical car occupies approximately 12$\times$12~pixels ($\sim$8~m$^2$), and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit. At 5~cm GSD (Potsdam-1), car detection reaches 96.9\%, confirming that spatial resolution is the primary limiting factor.
+
+\textit{Linear features.} Roads represent the most difficult object class on BSB-1, with 57.4\% object detection and an average of 30.1 segments per road polygon. Elongated, connected structures that span multiple tiles remain challenging for a tile-based approach.
+
+\textit{Tile size and resolution interaction.} On Potsdam-1 at 5~cm GSD, tile sizes below $T = 1{,}000$ cause merge chaining that degrades ASA from 75.8\% to 46.0\% at $T = 250$. This limits the potential for small-object detection improvement through tile size reduction at high spatial resolutions.
+
+\textit{Processing time.} Although time scales linearly with tile count, the absolute processing time remains substantial for very large images: approximately 14 hours for 1{,}600 tiles at $T = 250$. GPU utilization per tile is dominated by SAM2 inference, with limited opportunity for parallelism within the current tile-sequential architecture.
+
+\textit{Parameter sensitivity.} The default configuration was empirically tuned and performs well across the test scenes, but may not be optimal for all remote sensing scenarios. In particular, the threshold decay range and step size may benefit from scene-specific tuning for specialized applications.
+
+% ============================================================================
+% Conclusion
+% ============================================================================
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper presented RemoteSAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images. The key findings are:
+\begin{enumerate}
+    \item The multi-pass segmentation algorithm with black mask focusing and adaptive threshold decay increases coverage from 30--68\% (single-pass SAM2) to 89--98\%, with the black mask contributing 4--11~pp.
+    \item The Dense Grid point sampling strategy outperforms K-means by 1--3~pp on urban scenes with many small objects, while both strategies produce equivalent results on agricultural scenes.
+    \item The parameter-free best-match merge via Union-Find produces spatially consistent segmentation across tile boundaries in effectively linear time, enabling processing of images of arbitrary size with constant GPU memory usage.
+    \item Achievable Segmentation Accuracy reaches 90\% on BSB-1 (24~cm), 76\% on Potsdam-1 (5~cm), and 98\% on Plant23 (4.78~m). Object-level evaluation confirms building detection at 95--96\% (IoU 0.82--0.88), car detection at 81--97\% depending on spatial resolution, agricultural field detection at 95\% (IoU 0.98), and tree detection up to 96\% (IoU 0.94).
+    \item The pipeline is sensor-agnostic, operating on natural RGB (5~cm to 24~cm) and MNF false-color (4.78~m) without retraining.
+\end{enumerate}
+
+Tile size functions as an implicit scale parameter: reducing tile size from 1{,}000 to 250 increases car detection from 41\% to 81\% on BSB-1. At high spatial resolutions (5~cm GSD), tile sizes below 1{,}000 pixels cause merge chaining that degrades segmentation quality, establishing a practical minimum ground coverage per tile.
+
+Future work includes fine-tuning SAM2 on remote sensing data, integration with OBIA classification pipelines, hierarchical multi-scale segmentation that applies fine-resolution processing only to residual unsegmented areas, and an improved merge algorithm incorporating spectral similarity for high-resolution small tiles.
+
+% ============================================================================
+% References
+% ============================================================================
+
+\section*{CRediT authorship contribution statement}
+\textbf{Osmar Luiz Ferreira de Carvalho:} Conceptualization, Methodology, Software, Investigation, Writing -- original draft. \textbf{Osmar Ab\'{i}lio de Carvalho J\'{u}nior:} Supervision, Writing -- review \& editing, Resources. \textbf{Anesmar Olino de Albuquerque:} Data curation, Validation. \textbf{Daniel Guerreiro e Silva:} Writing -- review \& editing, Resources. \todo{Verify and adjust contributions.}
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\section*{Data availability}
+The ISPRS Potsdam dataset is publicly available from the ISPRS website. The Bras\'{i}lia and Plant23 datasets are available upon reasonable request. The RemoteSAMsing source code is available at \\url{https://github.com/osmarluiz/sam-mosaic}.
+
+\section*{Acknowledgements}
+\todo{Funding sources, computational resources, etc.}
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+\end{document}
