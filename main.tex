@@ -522,31 +522,31 @@ Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep
 
 \begin{table}[h!]
 \centering
-\caption{Baseline comparison. Det.\ = detection rate (\%), IoU = mean object IoU for detected objects, $\bar{n}$ = mean segments per detected object. ASA = global Achievable Segmentation Accuracy (\%). Best IoU per class in bold. SLIC: compactness = 10. Felzenszwalb: $\sigma = 0.5$, min\_size = 50. Segment counts: BSB-1 SLIC 18{,}368 / Felz 24{,}410 / RS 27{,}427; Potsdam-1 SLIC 1{,}995 / Felz 3{,}376 / RS 2{,}388; Plant23 SLIC 2{,}263 / Felz 5{,}810 / RS 3{,}530.}
+\caption{Baseline comparison. Det.\ = detection rate (\%), IoU = mean object IoU, ASA = per-class Achievable Segmentation Accuracy (\%). Best IoU per class in bold. SLIC: compactness = 10. Felzenszwalb: $\sigma = 0.5$, min\_size = 50. Segment counts: BSB-1 SLIC 18{,}368 / Felz 24{,}410 / RS 27{,}427; Potsdam-1 SLIC 1{,}995 / Felz 3{,}376 / RS 2{,}388; Plant23 SLIC 2{,}263 / Felz 5{,}810 / RS 3{,}530.}
 \label{tab:baselines}
-\begin{tabular}{llrrrrrrrr}
+\begin{tabular}{llrrrrrrrrr}
 \toprule
- & & \multicolumn{2}{c}{SLIC} & \multicolumn{3}{c}{Felzenszwalb} & \multicolumn{3}{c}{RemoteSAMsing} \\
-\cmidrule(lr){3-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
-Dataset & Class & Det. & IoU & Det. & IoU & $\bar{n}$ & Det. & IoU & $\bar{n}$ \\
+ & & \multicolumn{3}{c}{SLIC} & \multicolumn{3}{c}{Felzenszwalb} & \multicolumn{3}{c}{RemoteSAMsing} \\
+\cmidrule(lr){3-5} \cmidrule(lr){6-8} \cmidrule(lr){9-11}
+Dataset & Class & Det. & IoU & ASA & Det. & IoU & ASA & Det. & IoU & ASA \\
 \midrule
-\multirow{4}{*}{BSB-1} & Buildings & 69.5 & 0.70 & 83.9 & 0.51 & 3.7 & 94.7 & \textbf{0.82} & 2.8 \\
- & Trees     & 50.9 & 0.61 & 43.8 & 0.21 & 1.8 & 95.7 & \textbf{0.94} & 1.1 \\
- & Cars      &  0.0 & ---  & 61.6 & 0.57 & 1.0 & 81.3 & \textbf{0.79} & 1.0 \\
- & Pools     & 22.0 & 0.51 & 70.7 & 0.46 & 1.2 & 86.9 & \textbf{0.73} & 1.1 \\
-\cmidrule(lr){2-10}
- & ASA       & \multicolumn{2}{c}{80.8} & \multicolumn{3}{c}{57.4} & \multicolumn{3}{c}{\textbf{90.1}} \\
+\multirow{4}{*}{BSB-1} & Buildings & 69.5 & 0.70 & 84.3 & 83.9 & 0.51 & 68.4 & 94.7 & \textbf{0.82} & 92.3 \\
+ & Trees     & 50.9 & 0.61 & 76.0 & 43.8 & 0.21 &  5.9 & 95.7 & \textbf{0.94} & 95.5 \\
+ & Cars      &  0.0 & ---  &  0.0 & 61.6 & 0.57 & 58.1 & 81.3 & \textbf{0.79} & 78.6 \\
+ & Pools     & 22.0 & 0.51 &  4.3 & 70.7 & 0.46 & 21.5 & 86.9 & \textbf{0.73} & 65.2 \\
+\cmidrule(lr){2-11}
+ & \textit{Global ASA} & \multicolumn{3}{c}{80.8} & \multicolumn{3}{c}{57.4} & \multicolumn{3}{c}{\textbf{90.1}} \\
 \midrule
-\multirow{3}{*}{Potsdam-1} & Buildings & 85.9 & 0.75 & 85.9 & 0.20 & 23.6 & 96.2 & \textbf{0.88} & 9.2 \\
- & Cars      &  3.5 & 0.51 & 72.8 & 0.42 & 1.5 & 96.9 & \textbf{0.83} & 1.0 \\
- & Trees     & 60.4 & 0.55 & 42.1 & 0.03 & 6.2 & 67.1 & \textbf{0.47} & 2.9 \\
-\cmidrule(lr){2-10}
- & ASA       & \multicolumn{2}{c}{\textbf{78.9}} & \multicolumn{3}{c}{29.9} & \multicolumn{3}{c}{75.8} \\
+\multirow{3}{*}{Potsdam-1} & Buildings & 85.9 & 0.75 & 91.2 & 85.9 & 0.20 & 14.1 & 96.2 & \textbf{0.88} & 96.5 \\
+ & Cars      &  3.5 & 0.51 &  6.9 & 72.8 & 0.42 & 34.4 & 96.9 & \textbf{0.83} & 89.0 \\
+ & Trees     & 60.4 & 0.55 & 76.9 & 42.1 & 0.03 &  1.5 & 67.1 & \textbf{0.47} & 56.1 \\
+\cmidrule(lr){2-11}
+ & \textit{Global ASA} & \multicolumn{3}{c}{\textbf{78.9}} & \multicolumn{3}{c}{29.9} & \multicolumn{3}{c}{75.8} \\
 \midrule
-\multirow{3}{*}{Plant23} & Pivots & 82.1 & 0.79 & 67.9 & 0.29 & 2.2 & 100 & \textbf{0.99} & 1.0 \\
- & Crops     & 25.1 & 0.70 & 50.0 & 0.18 & 2.0 & 94.6 & \textbf{0.98} & 1.0 \\
-\cmidrule(lr){2-10}
- & ASA       & \multicolumn{2}{c}{86.6} & \multicolumn{3}{c}{62.7} & \multicolumn{3}{c}{\textbf{98.0}} \\
+\multirow{2}{*}{Plant23} & Pivots & 82.1 & 0.79 & 90.4 & 67.9 & 0.29 & 52.1 & 100 & \textbf{0.99} & 99.7 \\
+ & Crops     & 25.1 & 0.70 & 80.4 & 50.0 & 0.18 & 22.8 & 94.6 & \textbf{0.98} & 95.4 \\
+\cmidrule(lr){2-11}
+ & \textit{Global ASA} & \multicolumn{3}{c}{86.6} & \multicolumn{3}{c}{62.7} & \multicolumn{3}{c}{\textbf{98.0}} \\
 \bottomrule
 \end{tabular}
 \end{table}
