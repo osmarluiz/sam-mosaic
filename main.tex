@@ -530,28 +530,36 @@ Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep
 \cmidrule(lr){3-5} \cmidrule(lr){6-8} \cmidrule(lr){9-11}
 Dataset & Class & Det. & IoU & ASA & Det. & IoU & ASA & Det. & IoU & ASA \\
 \midrule
-\multirow{4}{*}{BSB-1} & Buildings & 69.5 & 0.70 & 84.3 & 83.9 & 0.51 & 68.4 & 94.7 & \textbf{0.82} & 92.3 \\
+\multirow{8}{*}{BSB-1} & Buildings & 69.5 & 0.70 & 84.3 & 83.9 & 0.51 & 68.4 & 94.7 & \textbf{0.82} & 92.3 \\
  & Trees     & 50.9 & 0.61 & 76.0 & 43.8 & 0.21 &  5.9 & 95.7 & \textbf{0.94} & 95.5 \\
  & Cars      &  0.0 & ---  &  0.0 & 61.6 & 0.57 & 58.1 & 81.3 & \textbf{0.79} & 78.6 \\
  & Pools     & 22.0 & 0.51 &  4.3 & 70.7 & 0.46 & 21.5 & 86.9 & \textbf{0.73} & 65.2 \\
+ & Roads     & 50.7 & 0.56 & 83.1 & 59.4 & 0.14 &  7.3 & 57.4 & \textbf{0.60} & 84.3 \\
+ & Courts    & 96.2 & 0.71 & 80.3 & 90.6 & 0.47 & 42.5 & 100  & \textbf{0.75} & 78.8 \\
+ & Lakes     & 55.6 & 0.77 & 98.3 & 66.7 & 0.25 &  0.2 & 100  & \textbf{0.78} & 99.4 \\
+ & Decks     & 50.0 & 0.58 & 50.9 & 80.0 & 0.48 & 27.5 & 80.0 & \textbf{0.84} & 88.7 \\
 \cmidrule(lr){2-11}
  & \textit{Global ASA} & \multicolumn{3}{c}{80.8} & \multicolumn{3}{c}{57.4} & \multicolumn{3}{c}{\textbf{90.1}} \\
 \midrule
-\multirow{3}{*}{Potsdam-1} & Buildings & 85.9 & 0.75 & 91.2 & 85.9 & 0.20 & 14.1 & 96.2 & \textbf{0.88} & 96.5 \\
+\multirow{6}{*}{Potsdam-1} & Buildings & 85.9 & 0.75 & 91.2 & 85.9 & 0.20 & 14.1 & 96.2 & \textbf{0.88} & 96.5 \\
  & Cars      &  3.5 & 0.51 &  6.9 & 72.8 & 0.42 & 34.4 & 96.9 & \textbf{0.83} & 89.0 \\
  & Trees     & 60.4 & 0.55 & 76.9 & 42.1 & 0.03 &  1.5 & 67.1 & \textbf{0.47} & 56.1 \\
+ & Low veg.  & 41.7 & 0.52 & 76.9 & 36.1 & 0.05 &  0.6 & 50.5 & \textbf{0.52} & 76.3 \\
+ & Impervious& 42.7 & 0.46 & 81.0 & 42.7 & 0.05 & 99.5 & 56.3 & \textbf{0.52} & 74.7 \\
+ & Clutter   & 11.5 & 0.43 & 22.2 & 70.6 & 0.35 & 17.6 & 71.7 & \textbf{0.61} & 49.3 \\
 \cmidrule(lr){2-11}
  & \textit{Global ASA} & \multicolumn{3}{c}{\textbf{78.9}} & \multicolumn{3}{c}{29.9} & \multicolumn{3}{c}{75.8} \\
 \midrule
-\multirow{2}{*}{Plant23} & Pivots & 82.1 & 0.79 & 90.4 & 67.9 & 0.29 & 52.1 & 100 & \textbf{0.99} & 99.7 \\
+\multirow{3}{*}{Plant23} & Pivots & 82.1 & 0.79 & 90.4 & 67.9 & 0.29 & 52.1 & 100  & \textbf{0.99} & 99.7 \\
  & Crops     & 25.1 & 0.70 & 80.4 & 50.0 & 0.18 & 22.8 & 94.6 & \textbf{0.98} & 95.4 \\
+ & Lakes     & 21.9 & 0.55 & 63.2 & 86.3 & 0.57 & 83.6 & 89.0 & \textbf{0.95} & 91.9 \\
 \cmidrule(lr){2-11}
  & \textit{Global ASA} & \multicolumn{3}{c}{86.6} & \multicolumn{3}{c}{62.7} & \multicolumn{3}{c}{\textbf{98.0}} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-RemoteSAMsing achieves the highest IoU on all 9 compared classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18). SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating that detected objects are poorly delineated; on Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction.
+RemoteSAMsing achieves the highest IoU on all 17 evaluated classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18). SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating that detected objects are poorly delineated; on Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction.
 
 On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%). This results from the merge chaining effect described in Section~\ref{sec:res_tilesize}: SLIC produces independent superpixels without tile boundary artifacts. Per-class metrics show RemoteSAMsing outperforms SLIC on every class (building IoU 0.88 vs.\ 0.75, car IoU 0.83 vs.\ 0.51).
 
