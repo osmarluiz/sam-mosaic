@@ -178,15 +178,6 @@ The procedure operates as follows. The first pass distributes a uniform $k \time
 
 \textbf{Point sampling strategies.} The first pass uses a uniform grid. For subsequent passes, points must target the residual unsegmented area, which shrinks and fragments as passes accumulate. RemoteSAMsing provides two strategies. \textit{K-means clustering} \citep{arthur2007kmeans} samples up to 10{,}000 coordinates from the residual mask and applies K-means with $k = 64$ clusters; centroids are snapped to valid pixels. The resulting distribution concentrates points in the largest residual areas. \textit{Dense Grid} generates a uniform $k \times k$ grid and discards points on already-segmented pixels. Unlike K-means, Dense Grid maintains uniform density across all residual regions regardless of their size, benefiting scenes with many small scattered objects. Section~\ref{sec:res_strategy} compares both strategies.
 
-Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on three datasets. Each column shows the cumulative segmentation at a different stage, with segments colored by the stage in which they were added (blue: initial pass, orange: intermediate passes, purple: final passes). Coverage increases from 32--57\% after the first pass to 88--98\% at convergence. The rate of progression varies by scene: BSB-1 (24~cm urban) requires 80 passes to reach 88\% coverage, while Potsdam-1 (5~cm urban) and Plant23 (4.78~m agricultural) converge faster due to larger objects relative to tile size.
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
-    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number, with markers indicating the stages shown above.}
-    \label{fig:multipass_progression}
-\end{figure}
-
 % ----------------------------------------------------------------------------
 \subsection{Scaling to Large Images}
 \label{sec:method_scaling}
@@ -349,6 +340,15 @@ Adaptive threshold decay is the largest single contributor, adding 13.9~pp on av
 The black mask adds 8.6~pp on average and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions, producing 27\% more segments (14{,}767 vs.\ 11{,}624 on BSB-1) without coverage progress.
 
 Contextual padding contributes less than 1~pp to coverage; its primary effect is on boundary quality, evaluated in Section~\ref{sec:res_merge}. The full pipeline requires $3$--$7\times$ more processing time than single-pass inference, reflecting the iterative multi-pass computation.
+
+Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on three datasets. Each column shows the cumulative segmentation at a different stage, with segments colored by the stage in which they were added (blue: initial pass, orange: intermediate passes, purple: final passes). Coverage increases from 32--57\% after the first pass to 88--98\% at convergence. BSB-1 (24~cm urban) requires 80 passes to reach 88\% coverage, while Potsdam-1 (5~cm urban) and Plant23 (4.78~m agricultural) converge faster due to larger objects relative to tile size.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
+    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number, with markers indicating the stages shown above.}
+    \label{fig:multipass_progression}
+\end{figure}
 
 \subsubsection{Point Sampling Strategy}
 \label{sec:res_strategy}
