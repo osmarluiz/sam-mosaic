@@ -305,8 +305,6 @@ The evaluation proceeds in three stages. Section~\ref{sec:res_config} identifies
 % ----------------------------------------------------------------------------
 \subsection{Pipeline Configuration Analysis}
 \label{sec:res_config}
-% ----------------------------------------------------------------------------
-
 \label{sec:res_ablation}
 
 Tables~\ref{tab:config_operational} and~\ref{tab:config_quality} present the pipeline configuration analysis across 15 configurations organized in three groups: single-pass baselines, multi-pass component ablation (with both point strategies), and tile size variation. Table~\ref{tab:config_operational} reports coverage, segment count, and processing time; Table~\ref{tab:config_quality} reports detection rate, IoU, and ASA for the same configurations.
@@ -377,17 +375,20 @@ Dense Grid, $T = 250$ & 91.9 & 0.87 & 88.1 & 69.6 & 0.61 & 46.0 & 95.3 & 0.98 & 
 \end{tabular}
 \end{table}
 
-Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%, confirming that multi-pass processing is essential.
+Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%, confirming that multi-pass processing is essential. Fig.~\ref{fig:multipass_progression} illustrates this progression: coverage increases from 32--57\% after the first pass to 88--98\% at convergence, with BSB-1 requiring 80 passes while Potsdam-1 and Plant23 converge faster due to larger objects relative to tile size.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
+    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number, with markers indicating the stages shown above.}
+    \label{fig:multipass_progression}
+\end{figure}
 
 The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions, producing 27\% more segments without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
 
 Dense Grid outperforms K-means by 1--3~pp on BSB scenes and produces 4--13\% more segments, at the cost of $2$--$3\times$ longer processing time. Dense Grid maintains uniform point density across all residual fragments, while K-means concentrates centroids in the largest residual areas, potentially leaving small isolated patches without prompt points.
 
-Table~\ref{tab:config_quality} reveals that coverage improvements translate directly to detection quality. On BSB-1, mDet increases from ?? (single pass, $\tau = 0.93$) to 63.2\% (K-means, $T = 1{,}000$). Reducing tile size further improves detection: mDet reaches 90.0\% at $T = 250$ with K-means and 91.9\% with Dense Grid, as smaller tiles magnify objects in SAM2's feature space.
-
-ASA degrades at smaller tile sizes on Potsdam-1 (75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$) and Plant23 (98.0\% to 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with multiple objects per tile.
-
-Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection in BSB-1. At $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas. At $T = 250$, 91\% of the 259 cars in this crop are correctly detected with segment-to-object ratios below $3\times$.
+Table~\ref{tab:config_quality} reveals that coverage improvements translate directly to detection quality. On BSB-1 at $T = 1{,}000$, K-means achieves mDet of 63.2\%, leaving many small objects undetected. Reducing tile size addresses this: mDet reaches 90.0\% at $T = 250$ with K-means and 91.9\% with Dense Grid, as smaller tiles magnify objects in SAM2's internal $1{,}024 \times 1{,}024$ resolution. Fig.~\ref{fig:tilesize_cars} illustrates this effect on car detection in BSB-1: at $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas, while at $T = 250$, 91\% of 259 cars are correctly detected.
 
 \begin{figure}[h!]
     \centering
@@ -396,14 +397,7 @@ Fig.~\ref{fig:tilesize_cars} illustrates the tile size effect on car detection i
     \label{fig:tilesize_cars}
 \end{figure}
 
-Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on three datasets. Coverage increases from 32--57\% after the first pass to 88--98\% at convergence. BSB-1 requires 80 passes to reach 88\% coverage, while Potsdam-1 and Plant23 converge faster due to larger objects relative to tile size.
-
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
-    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number, with markers indicating the stages shown above.}
-    \label{fig:multipass_progression}
-\end{figure}
+Smaller tiles do not universally improve quality. ASA degrades at $T = 250$ on Potsdam-1 (75.8\% $\rightarrow$ 46.0\%) and Plant23 (98.0\% $\rightarrow$ 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile.
 
 Based on these results, the subsequent quality evaluation (Section~\ref{sec:res_quality}) uses Dense Grid with $T = 250$ for BSB-1 (maximizing small-object detection at 24~cm GSD) and Dense Grid with $T = 1{,}000$ for Potsdam-1 and Plant23 (avoiding merge chaining).
 
