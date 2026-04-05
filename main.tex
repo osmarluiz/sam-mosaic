@@ -305,8 +305,6 @@ Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for a
 \label{sec:res_config}
 \label{sec:res_ablation}
 
-Pipeline configuration controls a trade-off between coverage and detection quality (Table~\ref{tab:config}).
-
 \begin{table}[h!]
 \centering
 \caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), weighted mean detection rate (mDet, \%), and Achievable Segmentation Accuracy (ASA, \%) across three scenes. Configurations are grouped into single-pass baselines (strategy-independent), multi-pass component ablation at $T = 1{,}000$, and tile size variation with the full pipeline.}
@@ -342,7 +340,7 @@ $T = 250$ & 97.8 & 66{,}253 & 91.7 & 88.1 & 99.2 & 11{,}851 & 65.2 & 46.0 & 99.4
 \end{tabular}
 \end{table}
 
-Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image with mDet of 24--79\%. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%. Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on individual tiles: coverage increases from 32--57\% after the first pass to 89--98\% at convergence. BSB-1 tiles require up to 80 passes, while Potsdam-1 and Plant23 tiles converge faster due to larger objects relative to tile size.
+Pipeline configuration controls a trade-off between coverage and detection quality (Table~\ref{tab:config}). Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image with mDet of 24--79\%. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%. Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on individual tiles: coverage increases from 32--57\% after the first pass to 89--98\% at convergence. BSB-1 tiles require up to 80 passes, while Potsdam-1 and Plant23 tiles converge faster due to larger objects relative to tile size.
 
 \begin{figure}[h!]
     \centering
