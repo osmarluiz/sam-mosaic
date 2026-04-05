@@ -311,31 +311,33 @@ Pipeline configuration controls a trade-off between coverage and detection quali
 \centering
 \caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), weighted mean detection rate (mDet, \%), and Achievable Segmentation Accuracy (ASA, \%) across three scenes. Configurations are grouped into single-pass baselines (strategy-independent), multi-pass component ablation at $T = 1{,}000$, and tile size variation with the full pipeline.}
 \label{tab:config}
-\footnotesize
+\scriptsize
 \begin{tabular}{lrrrrrrrrrrrr}
 \toprule
  & \multicolumn{4}{c}{BSB-1 (24~cm)} & \multicolumn{4}{c}{Potsdam-1 (5~cm)} & \multicolumn{4}{c}{Plant23 (4.78~m)} \\
 \cmidrule(lr){2-5} \cmidrule(lr){6-9} \cmidrule(lr){10-13}
 Configuration & Cov. & Time & mDet & ASA & Cov. & Time & mDet & ASA & Cov. & Time & mDet & ASA \\
 \midrule
-\multicolumn{13}{l}{\textit{Single pass}} \\
+\multicolumn{13}{l}{\footnotesize\textit{Single pass (strategy-independent)}} \\[2pt]
 $\tau = 0.93$ & 30.1 & 320 & 24.3 & 67.0 & 36.5 & 160 & 49.0 & 53.8 & 68.5 & 487 & 78.5 & 90.5 \\
-$\tau = 0.86$ & 58.5 & 509 & 55.7 & 78.3 & 67.4 & 208 & 70.3 & 68.0 & 84.4 & 581 & 90.0 & 95.7 \\
+$\tau = 0.86$ (default) & 58.5 & 509 & 55.7 & 78.3 & 67.4 & 208 & 70.3 & 68.0 & 84.4 & 581 & 90.0 & 95.7 \\
 $\tau = 0.70$ & 77.0 & 829 & 79.8 & 86.9 & 86.1 & 313 & 77.4 & 79.6 & 93.4 & 829 & 91.6 & 96.7 \\
 \midrule
-\multicolumn{13}{l}{\textit{Multi-pass component ablation ($T = 1{,}000$)}} \\
-Full pipeline (K-means) & 89.0 & 2{,}293 & 63.2 & 86.2 & 97.7 & 564 & 66.3 & 75.1 & 97.7 & 1{,}137 & 94.8 & 98.0 \\
-\quad No black mask & 78.3 & 2{,}614 & 75.5 & 87.6 & 86.6 & 901 & 74.7 & 80.6 & 93.8 & 1{,}857 & 94.7 & 97.8 \\
-\quad Fixed threshold & 66.6 & 621 & 65.2 & 83.4 & 82.9 & 249 & 74.9 & 77.1 & 93.4 & 665 & 94.8 & 98.1 \\
-Full pipeline (Dense Grid) & 91.5 & 13{,}065 & 65.3 & 86.2 & 97.1 & 2{,}549 & 69.6 & 75.8 & 98.1 & 3{,}959 & 95.3 & 98.0 \\
-\quad No black mask & 80.4 & 10{,}023 & 82.3 & 88.0 & 87.7 & 3{,}411 & 78.7 & 81.3 & 94.4 & 5{,}321 & 95.7 & 97.9 \\
-\quad Fixed threshold & 71.8 & 1{,}312 & 67.9 & 84.4 & 87.6 & 384 & 75.5 & 78.0 & 95.5 & 997 & 95.4 & 98.1 \\
+\multicolumn{13}{l}{\footnotesize\textit{Multi-pass ablation, K-means ($T = 1{,}000$)}} \\[2pt]
+Full pipeline & 89.0 & 2{,}293 & 63.2 & 86.2 & 97.7 & 564 & 66.3 & 75.1 & 97.7 & 1{,}137 & 94.8 & 98.0 \\
+\quad w/o black mask & 78.3 & 2{,}614 & 75.5 & 87.6 & 86.6 & 901 & 74.7 & 80.6 & 93.8 & 1{,}857 & 94.7 & 97.8 \\
+\quad w/o adaptive thr. & 66.6 & 621 & 65.2 & 83.4 & 82.9 & 249 & 74.9 & 77.1 & 93.4 & 665 & 94.8 & 98.1 \\[4pt]
+\multicolumn{13}{l}{\footnotesize\textit{Multi-pass ablation, Dense Grid ($T = 1{,}000$)}} \\[2pt]
+Full pipeline & 91.5 & 13{,}065 & 65.3 & 86.2 & 97.1 & 2{,}549 & 69.6 & 75.8 & 98.1 & 3{,}959 & 95.3 & 98.0 \\
+\quad w/o black mask & 80.4 & 10{,}023 & 82.3 & 88.0 & 87.7 & 3{,}411 & 78.7 & 81.3 & 94.4 & 5{,}321 & 95.7 & 97.9 \\
+\quad w/o adaptive thr. & 71.8 & 1{,}312 & 67.9 & 84.4 & 87.6 & 384 & 75.5 & 78.0 & 95.5 & 997 & 95.4 & 98.1 \\
 \midrule
-\multicolumn{13}{l}{\textit{Tile size (full pipeline)}} \\
-K-means, $T = 500$ & 96.1 & 9{,}848 & 79.6 & 89.3 & 98.8 & 2{,}641 & 62.0 & 61.0 & 99.1 & 6{,}106 & 73.3 & 88.1 \\
-K-means, $T = 250$ & 97.5 & 28{,}885 & 90.0 & 88.5 & 99.2 & 6{,}967 & 58.1 & 42.9 & 99.4 & 18{,}031 & 65.1 & 78.9 \\
-Dense Grid, $T = 500$ & 96.9 & 24{,}872 & 81.0 & 90.1 & 98.9 & 5{,}896 & 61.6 & 60.4 & 99.1 & 6{,}988 & 74.0 & 88.1 \\
-Dense Grid, $T = 250$ & 97.8 & 66{,}253 & 91.7 & 88.1 & 99.2 & 11{,}851 & 65.2 & 46.0 & 99.4 & 22{,}252 & 64.6 & 78.7 \\
+\multicolumn{13}{l}{\footnotesize\textit{Tile size, K-means (full pipeline)}} \\[2pt]
+$T = 500$ & 96.1 & 9{,}848 & 79.6 & 89.3 & 98.8 & 2{,}641 & 62.0 & 61.0 & 99.1 & 6{,}106 & 73.3 & 88.1 \\
+$T = 250$ & 97.5 & 28{,}885 & 90.0 & 88.5 & 99.2 & 6{,}967 & 58.1 & 42.9 & 99.4 & 18{,}031 & 65.1 & 78.9 \\[4pt]
+\multicolumn{13}{l}{\footnotesize\textit{Tile size, Dense Grid (full pipeline)}} \\[2pt]
+$T = 500$ & 96.9 & 24{,}872 & 81.0 & 90.1 & 98.9 & 5{,}896 & 61.6 & 60.4 & 99.1 & 6{,}988 & 74.0 & 88.1 \\
+$T = 250$ & 97.8 & 66{,}253 & 91.7 & 88.1 & 99.2 & 11{,}851 & 65.2 & 46.0 & 99.4 & 22{,}252 & 64.6 & 78.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
