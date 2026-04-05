@@ -291,7 +291,7 @@ Following established object-based evaluation protocols \citep{clinton2010segmen
 \label{sec:results}
 % ============================================================================
 
-Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth. BSB-1 (24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage, Potsdam-1 (5~cm GSD) into 2{,}388 segments at 97.1\%, and Plant23 (4.78~m GSD, MNF false-color) into 3{,}530 segments at 99.4\%.
+Fig.~\ref{fig:full_segmentation} presents the complete output for all three datasets with ground truth. RemoteSAMsing produces 27{,}427 segments at 97.8\% pixel coverage on BSB-1 (24~cm GSD), 2{,}388 segments at 97.1\% on Potsdam-1 (5~cm GSD), and 3{,}530 segments at 99.4\% on Plant23 (4.78~m GSD, MNF false-color).
 
 \begin{figure}[p]
     \centering
@@ -305,7 +305,7 @@ Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for a
 \label{sec:res_config}
 \label{sec:res_ablation}
 
-Pipeline configuration affects coverage and detection quality in different, sometimes opposing, directions (Table~\ref{tab:config}).
+Pipeline configuration controls a trade-off between coverage and detection quality (Table~\ref{tab:config}).
 
 \begin{table}[h!]
 \centering
@@ -351,7 +351,7 @@ Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30
 
 The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
 
-At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). The additional segments from late multi-pass iterations, generated at relaxed thresholds, cover residual areas with large imprecise segments that fail the per-object detection protocol. On BSB-1, 53\% of cars (929 of 1{,}717) are covered by such segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
+At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). Late multi-pass iterations at relaxed thresholds generate large, imprecise segments that cover residual areas but fail the per-object detection protocol. On BSB-1, 53\% of cars (929 of 1{,}717) are covered by such segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
 \begin{figure}[h!]
     \centering
@@ -362,7 +362,7 @@ At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-m
 
 Dense Grid outperforms K-means by 1--3~pp on BSB scenes at the cost of $2$--$3\times$ longer processing time. Dense Grid maintains uniform point density across all residual fragments, while K-means concentrates centroids in the largest residual areas.
 
-Reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\% (K-means, $T = 1{,}000$) to 90\% ($T = 250$) and 92\% with Dense Grid, as smaller tiles magnify objects in SAM2's internal resolution. Fig.~\ref{fig:tilesize_cars} illustrates this on car detection: at $T = 1{,}000$, most cars are absorbed into large segments, while at $T = 250$, 91\% of 259 cars in this crop are correctly detected.
+Reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\% (K-means, $T = 1{,}000$) to 90\% ($T = 250$) and 92\% with Dense Grid, as smaller tiles increase each object's pixel footprint in SAM2's fixed internal resolution. Fig.~\ref{fig:tilesize_cars} illustrates this on car detection: at $T = 1{,}000$, most cars are absorbed into large segments, while at $T = 250$, 91\% of 259 cars in this crop are correctly detected.
 
 \begin{figure}[h!]
     \centering
@@ -526,11 +526,9 @@ Dataset & Class & Det. & IoU & ASA & Det. & IoU & ASA & Det. & IoU & ASA \\
 
 RemoteSAMsing achieves the highest IoU on all 17 evaluated classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18).
 
-SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%) due to the absence of merge chaining artifacts (Section~\ref{sec:res_config}), but per-class metrics show RemoteSAMsing outperforms SLIC on every class.
+SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%) because SLIC produces independent superpixels without tile boundary artifacts. Per-class metrics nevertheless show RemoteSAMsing outperforming SLIC on every individual class.
 
-Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating poor boundary alignment with objects. On Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb achieves 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05, because this dominant class is assigned as the majority label to most large segments regardless of boundary accuracy.
-
-Processing time varies widely: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 564--13{,}065~s at $T = 1{,}000$ depending on scene and strategy (Table~\ref{tab:config}).
+Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating poor boundary alignment. On Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb reaches 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05: impervious surfaces dominate the scene, and most large segments receive this class as their majority label regardless of boundary accuracy. Processing time varies widely: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 564--13{,}065~s at $T = 1{,}000$ (Table~\ref{tab:config}).
 
 % ============================================================================
 \section{Discussion}
