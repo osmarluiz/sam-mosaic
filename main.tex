@@ -235,7 +235,7 @@ Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
 \subsection{Implementation Details}
 \label{sec:exp_impl}
 
-All experiments use the SAM2.1 model with the Hiera Large backbone, the largest available checkpoint. The pipeline is implemented in Python~3.12 using PyTorch~2.9 with CUDA~12.8 for GPU inference. All experiments were run on a workstation equipped with an Intel Core i9-14900K CPU, 64~GB of RAM, and an NVIDIA RTX~4090 GPU with 24~GB of VRAM. The default configuration parameters are listed in Table~\ref{tab:default_config}. The source code is publicly available at \\url{https://github.com/osmarluiz/sam-mosaic}.
+All experiments use the SAM2.1 model with the Hiera Large backbone, the largest available checkpoint. The pipeline is implemented in Python~3.12 using PyTorch~2.9 with CUDA~12.8 for GPU inference. All experiments were run on a workstation equipped with an Intel Core i9-14900K CPU, 64~GB of RAM, and an NVIDIA RTX~4090 GPU with 24~GB of VRAM. The default configuration parameters are listed in Table~\ref{tab:default_config}. The source code is publicly available at \url{https://github.com/osmarluiz/sam-mosaic}.
 
 \begin{table}[h!]
 \centering
@@ -349,9 +349,9 @@ Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30
     \label{fig:multipass_progression}
 \end{figure}
 
-The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
+The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces an unexpected effect: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
 
-At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). Late multi-pass iterations at relaxed thresholds generate large, imprecise segments that cover residual areas but fail the per-object detection protocol. On BSB-1, 53\% of cars (929 of 1{,}717) are covered by such segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
+At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). Late multi-pass iterations at relaxed thresholds generate large, imprecise segments that cover residual areas but fail the per-object detection protocol; configurations with fewer effective passes (such as no-black-mask) produce fewer of these imprecise segments. On BSB-1, 53\% of cars (929 of 1{,}717) are covered by giant segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
 \begin{figure}[h!]
     \centering
@@ -360,9 +360,9 @@ At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-m
     \label{fig:ablation_visual}
 \end{figure}
 
-Dense Grid outperforms K-means by 1--3~pp on BSB scenes at the cost of $2$--$3\times$ longer processing time. Dense Grid maintains uniform point density across all residual fragments, while K-means concentrates centroids in the largest residual areas.
+Dense Grid outperforms K-means by 1--3~pp in coverage on BSB scenes at the cost of $2$--$3\times$ longer processing time. This strategy maintains uniform point density across all residual fragments, while K-means concentrates centroids in the largest residual areas.
 
-Reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\% (K-means, $T = 1{,}000$) to 90\% ($T = 250$) and 92\% with Dense Grid, as smaller tiles increase each object's pixel footprint in SAM2's fixed internal resolution. Fig.~\ref{fig:tilesize_cars} illustrates this on car detection: at $T = 1{,}000$, most cars are absorbed into large segments, while at $T = 250$, 91\% of 259 cars in this crop are correctly detected.
+Beyond point strategy, reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\% (K-means, $T = 1{,}000$) to 90\% ($T = 250$) and 92\% with Dense Grid, as smaller tiles increase each object's pixel footprint in SAM2's fixed internal resolution. Fig.~\ref{fig:tilesize_cars} illustrates this on car detection: at $T = 1{,}000$, most cars are absorbed into large segments, while at $T = 250$, 91\% of 259 cars in this crop are correctly detected.
 
 \begin{figure}[h!]
     \centering
@@ -371,9 +371,9 @@ Reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\
     \label{fig:tilesize_cars}
 \end{figure}
 
-Smaller tiles do not universally improve quality. ASA degrades at $T = 250$ on Potsdam-1 (75.8\% $\rightarrow$ 46.0\%) and Plant23 (98.0\% $\rightarrow$ 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile.
+Smaller tiles do not universally improve quality. ASA drops from 75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$ on Potsdam-1, and from 98.0\% to 78.7\% on Plant23, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile.
 
-Processing time ranges from 160~s (single pass, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$, BSB-1), scaling approximately linearly with tile count. GPU memory remains constant regardless of image size, as only one tile is loaded at a time.
+Processing time ranges from 160~s (single pass on 36 tiles, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$ on 1{,}024 tiles, BSB-1), scaling approximately linearly with tile count.
 
 % ----------------------------------------------------------------------------
 \subsection{Boundary Merge}
@@ -526,7 +526,7 @@ Dataset & Class & Det. & IoU & ASA & Det. & IoU & ASA & Det. & IoU & ASA \\
 
 RemoteSAMsing achieves the highest IoU on all 17 evaluated classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18).
 
-SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%) because SLIC produces independent superpixels without tile boundary artifacts. Per-class metrics nevertheless show RemoteSAMsing outperforming SLIC on every individual class.
+SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%) because SLIC produces independent superpixels without tile boundary artifacts. Per-class IoU nevertheless shows RemoteSAMsing outperforming SLIC on every individual class.
 
 Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating poor boundary alignment. On Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb reaches 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05: impervious surfaces dominate the scene, and most large segments receive this class as their majority label regardless of boundary accuracy. Processing time varies widely: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 564--13{,}065~s at $T = 1{,}000$ (Table~\ref{tab:config}).
 
@@ -648,7 +648,7 @@ Future work includes fine-tuning SAM2 on remote sensing data, integration with O
 The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
 
 \section*{Data availability}
-The ISPRS Potsdam dataset is publicly available from the ISPRS website. The Bras\'{i}lia and Plant23 datasets are available upon reasonable request. The RemoteSAMsing source code is available at \\url{https://github.com/osmarluiz/sam-mosaic}.
+The ISPRS Potsdam dataset is publicly available from the ISPRS website. The Bras\'{i}lia and Plant23 datasets are available upon reasonable request. The RemoteSAMsing source code is available at \url{https://github.com/osmarluiz/sam-mosaic}.
 
 \section*{Acknowledgements}
 \todo{Funding sources, computational resources, etc.}
