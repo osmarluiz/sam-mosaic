@@ -293,7 +293,7 @@ Following established object-based evaluation protocols \citep{clinton2010segmen
 
 Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth, providing a visual overview of the results quantified in the following subsections. BSB-1 (24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage, Potsdam-1 (5~cm GSD) into 2{,}388 segments at 97.1\%, and Plant23 (4.78~m GSD, MNF false-color) into 3{,}530 segments at 99.4\%.
 
-The evaluation proceeds in three stages. Section~\ref{sec:res_config} identifies the optimal pipeline configuration through component ablation, point strategy comparison, and tile size analysis. Section~\ref{sec:res_merge} validates the boundary merge algorithm. Section~\ref{sec:res_quality} evaluates segmentation quality at the resulting best configuration per dataset against ground truth and traditional baselines.
+The evaluation proceeds in four stages. Section~\ref{sec:res_config} analyzes pipeline configuration through component ablation, point strategy comparison, and tile size variation, reporting both coverage and detection quality. Section~\ref{sec:res_merge} validates the boundary merge algorithm. Section~\ref{sec:res_quality} presents per-class segmentation quality at the recommended configuration. Section~\ref{sec:res_baselines} compares against traditional baselines.
 
 \begin{figure}[p]
     \centering
@@ -307,88 +307,64 @@ The evaluation proceeds in three stages. Section~\ref{sec:res_config} identifies
 \label{sec:res_config}
 \label{sec:res_ablation}
 
-Tables~\ref{tab:config_operational} and~\ref{tab:config_quality} present the pipeline configuration analysis across 15 configurations organized in three groups: single-pass baselines, multi-pass component ablation (with both point strategies), and tile size variation. Table~\ref{tab:config_operational} reports coverage, segment count, and processing time; Table~\ref{tab:config_quality} reports detection rate, IoU, and ASA for the same configurations.
+Table~\ref{tab:config} presents the pipeline configuration analysis across 15 configurations, reporting coverage, processing time, weighted mean detection rate (mDet), and Achievable Segmentation Accuracy (ASA) for each. Configurations are organized in three groups: single-pass baselines, multi-pass component ablation with both point strategies, and tile size variation.
 
 \begin{table}[h!]
 \centering
-\caption{Pipeline configuration: coverage (\%), segment count, and processing time (seconds) across three scenes. Configurations are grouped into single-pass baselines (strategy-independent), multi-pass component ablation at $T = 1{,}000$, and tile size variation with the full pipeline.}
-\label{tab:config_operational}
-\small
-\begin{tabular}{lrrrrrrrrr}
+\caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), weighted mean detection rate (mDet, \%), and Achievable Segmentation Accuracy (ASA, \%) across three scenes. Configurations are grouped into single-pass baselines (strategy-independent), multi-pass component ablation at $T = 1{,}000$, and tile size variation with the full pipeline.}
+\label{tab:config}
+\footnotesize
+\begin{tabular}{lrrrrrrrrrrrr}
 \toprule
- & \multicolumn{3}{c}{BSB-1 (24~cm)} & \multicolumn{3}{c}{Potsdam-1 (5~cm)} & \multicolumn{3}{c}{Plant23 (4.78~m)} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
-Configuration & Cov. & Seg. & Time & Cov. & Seg. & Time & Cov. & Seg. & Time \\
+ & \multicolumn{4}{c}{BSB-1 (24~cm)} & \multicolumn{4}{c}{Potsdam-1 (5~cm)} & \multicolumn{4}{c}{Plant23 (4.78~m)} \\
+\cmidrule(lr){2-5} \cmidrule(lr){6-9} \cmidrule(lr){10-13}
+Configuration & Cov. & Time & mDet & ASA & Cov. & Time & mDet & ASA & Cov. & Time & mDet & ASA \\
 \midrule
-\multicolumn{10}{l}{\textit{Single pass}} \\
-$\tau = 0.93$ & 30.1 & 3{,}255 & 320 & 36.5 & 1{,}264 & 160 & 68.5 & 3{,}152 & 487 \\
-$\tau = 0.86$ & 58.5 & 10{,}069 & 509 & 67.4 & 2{,}581 & 208 & 84.4 & 4{,}570 & 581 \\
-$\tau = 0.70$ & 77.0 & 15{,}889 & 829 & 86.1 & 3{,}455 & 313 & 93.4 & 5{,}308 & 829 \\
+\multicolumn{13}{l}{\textit{Single pass}} \\
+$\tau = 0.93$ & 30.1 & 320 & 24.3 & 67.0 & 36.5 & 160 & 49.0 & 53.8 & 68.5 & 487 & 78.5 & 90.5 \\
+$\tau = 0.86$ & 58.5 & 509 & 55.7 & 78.3 & 67.4 & 208 & 70.3 & 68.0 & 84.4 & 581 & 90.0 & 95.7 \\
+$\tau = 0.70$ & 77.0 & 829 & 79.8 & 86.9 & 86.1 & 313 & 77.4 & 79.6 & 93.4 & 829 & 91.6 & 96.7 \\
 \midrule
-\multicolumn{10}{l}{\textit{Multi-pass component ablation ($T = 1{,}000$)}} \\
-Full pipeline (K-means) & 89.0 & 12{,}043 & 2{,}293 & 97.7 & 1{,}979 & 564 & 97.7 & 4{,}141 & 1{,}137 \\
-\quad No black mask & 78.3 & 14{,}767 & 2{,}614 & 86.6 & 3{,}086 & 901 & 93.8 & 4{,}973 & 1{,}857 \\
-\quad Fixed threshold & 66.6 & 10{,}862 & 621 & 82.9 & 2{,}705 & 249 & 93.4 & 4{,}916 & 665 \\
-Full pipeline (Dense Grid) & 91.5 & 13{,}533 & 13{,}065 & 97.1 & 2{,}388 & 2{,}549 & 98.1 & 4{,}533 & 3{,}959 \\
-\quad No black mask & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-\quad Fixed threshold & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
+\multicolumn{13}{l}{\textit{Multi-pass component ablation ($T = 1{,}000$)}} \\
+Full pipeline (K-means) & 89.0 & 2{,}293 & 63.2 & 86.2 & 97.7 & 564 & 66.3 & 75.1 & 97.7 & 1{,}137 & 94.8 & 98.0 \\
+\quad No black mask & 78.3 & 2{,}614 & 75.5 & 87.6 & 86.6 & 901 & 74.7 & 80.6 & 93.8 & 1{,}857 & 94.7 & 97.8 \\
+\quad Fixed threshold & 66.6 & 621 & 65.2 & 83.4 & 82.9 & 249 & 74.9 & 77.1 & 93.4 & 665 & 94.8 & 98.1 \\
+Full pipeline (Dense Grid) & 91.5 & 13{,}065 & 65.3 & 86.2 & 97.1 & 2{,}549 & 69.6 & 75.8 & 98.1 & 3{,}959 & 95.3 & 98.0 \\
+\quad No black mask & 80.4 & 10{,}023 & 82.3 & 88.0 & 87.7 & 3{,}411 & 78.7 & 81.3 & 94.4 & 5{,}321 & 95.7 & 97.9 \\
+\quad Fixed threshold & 71.8 & 1{,}312 & 67.9 & 84.4 & 87.6 & 384 & 75.5 & 78.0 & 95.5 & 997 & 95.4 & 98.1 \\
 \midrule
-\multicolumn{10}{l}{\textit{Tile size (full pipeline)}} \\
-K-means, $T = 500$ & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-K-means, $T = 250$ & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-Dense Grid, $T = 500$ & 95.5 & ?? & 16{,}815 & 98.6 & ?? & 4{,}474 & 98.7 & ?? & 4{,}404 \\
-Dense Grid, $T = 250$ & 97.4 & ?? & 50{,}161 & 99.1 & ?? & 8{,}639 & 99.1 & ?? & 14{,}111 \\
+\multicolumn{13}{l}{\textit{Tile size (full pipeline)}} \\
+K-means, $T = 500$ & 96.1 & 9{,}848 & 79.6 & 89.3 & 98.8 & 2{,}641 & 62.0 & 61.0 & 99.1 & 6{,}106 & 73.3 & 88.1 \\
+K-means, $T = 250$ & 97.5 & 28{,}885 & 90.0 & 88.5 & 99.2 & 6{,}967 & 58.1 & 42.9 & 99.4 & 18{,}031 & 65.1 & 78.9 \\
+Dense Grid, $T = 500$ & 96.9 & 24{,}872 & 81.0 & 90.1 & 98.9 & 5{,}896 & 61.6 & 60.4 & 99.1 & 6{,}988 & 74.0 & 88.1 \\
+Dense Grid, $T = 250$ & 97.8 & 66{,}253 & 91.7 & 88.1 & 99.2 & 11{,}851 & 65.2 & 46.0 & 99.4 & 22{,}252 & 64.6 & 78.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h!]
-\centering
-\caption{Pipeline configuration: segmentation quality across three scenes. mDet = weighted mean detection rate (\%), mIoU = weighted mean object IoU, ASA = Achievable Segmentation Accuracy (\%). Same configurations as Table~\ref{tab:config_operational}.}
-\label{tab:config_quality}
-\small
-\begin{tabular}{lrrrrrrrrr}
-\toprule
- & \multicolumn{3}{c}{BSB-1 (24~cm)} & \multicolumn{3}{c}{Potsdam-1 (5~cm)} & \multicolumn{3}{c}{Plant23 (4.78~m)} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
-Configuration & mDet & mIoU & ASA & mDet & mIoU & ASA & mDet & mIoU & ASA \\
-\midrule
-\multicolumn{10}{l}{\textit{Single pass}} \\
-$\tau = 0.93$ & ?? & ?? & 67.0 & ?? & ?? & 53.8 & ?? & ?? & 90.5 \\
-$\tau = 0.86$ & ?? & ?? & 78.3 & ?? & ?? & 68.0 & ?? & ?? & 95.7 \\
-$\tau = 0.70$ & ?? & ?? & 86.9 & ?? & ?? & 79.6 & ?? & ?? & 96.7 \\
-\midrule
-\multicolumn{10}{l}{\textit{Multi-pass component ablation ($T = 1{,}000$)}} \\
-Full pipeline (K-means) & 63.2 & 0.74 & 86.2 & 66.3 & 0.61 & 75.1 & 94.8 & 0.98 & 98.0 \\
-\quad No black mask & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-\quad Fixed threshold & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-Full pipeline (Dense Grid) & ?? & ?? & 86.2 & ?? & ?? & 75.8 & ?? & ?? & 98.0 \\
-\quad No black mask & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-\quad Fixed threshold & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? & ?? \\
-\midrule
-\multicolumn{10}{l}{\textit{Tile size (full pipeline)}} \\
-K-means, $T = 500$ & 79.6 & 0.79 & 89.3 & 62.0 & 0.56 & 61.0 & 73.3 & 0.88 & 88.1 \\
-K-means, $T = 250$ & 90.0 & 0.85 & 88.5 & 58.1 & 0.46 & 42.9 & 65.1 & 0.84 & 78.9 \\
-Dense Grid, $T = 500$ & ?? & ?? & 90.1 & ?? & ?? & 60.4 & ?? & ?? & 88.1 \\
-Dense Grid, $T = 250$ & 91.9 & 0.87 & 88.1 & 69.6 & 0.61 & 46.0 & 95.3 & 0.98 & 78.7 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%, confirming that multi-pass processing is essential. Fig.~\ref{fig:multipass_progression} illustrates this progression: coverage increases from 32--57\% after the first pass to 88--98\% at convergence, with BSB-1 requiring 80 passes while Potsdam-1 and Plant23 converge faster due to larger objects relative to tile size.
+Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image with mDet of 24--79\%. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%. Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression: coverage increases from 32--57\% after the first pass to 88--98\% at convergence, with BSB-1 requiring 80 passes while Potsdam-1 and Plant23 converge faster due to larger objects relative to tile size.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
-    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number, with markers indicating the stages shown above.}
+    \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number.}
     \label{fig:multipass_progression}
 \end{figure}
 
-The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions, producing 27\% more segments without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
+The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
 
-Dense Grid outperforms K-means by 1--3~pp on BSB scenes and produces 4--13\% more segments, at the cost of $2$--$3\times$ longer processing time. Dense Grid maintains uniform point density across all residual fragments, while K-means concentrates centroids in the largest residual areas, potentially leaving small isolated patches without prompt points.
+Table~\ref{tab:config} reveals a nuance: at $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). The additional segments from late multi-pass iterations, generated at relaxed thresholds, cover residual areas with large imprecise segments that fail the per-object detection protocol. On BSB-1, 53\% of cars (929 of 1{,}755) are covered by such segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
-Table~\ref{tab:config_quality} reveals that coverage improvements translate directly to detection quality. On BSB-1 at $T = 1{,}000$, K-means achieves mDet of 63.2\%, leaving many small objects undetected. Reducing tile size addresses this: mDet reaches 90.0\% at $T = 250$ with K-means and 91.9\% with Dense Grid, as smaller tiles magnify objects in SAM2's internal $1{,}024 \times 1{,}024$ resolution. Fig.~\ref{fig:tilesize_cars} illustrates this effect on car detection in BSB-1: at $T = 1{,}000$, most cars are absorbed into large segments covering entire parking areas, while at $T = 250$, 91\% of 259 cars are correctly detected.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_ablation_visual.png}
+    \caption{Visual comparison of pipeline configurations on BSB-1 (24~cm GSD). A: original image. B--D: single-pass SAM2 at three thresholds, showing increasing coverage with decreasing segment quality. E: multi-pass without black mask. F: multi-pass with fixed threshold. G: full pipeline at $T = 1{,}000$, achieving high coverage but with large segments. H: full pipeline (Dense Grid, $T = 250$), where each object is individually delineated.}
+    \label{fig:ablation_visual}
+\end{figure}
+
+Dense Grid outperforms K-means by 1--3~pp on BSB scenes at the cost of $2$--$3\times$ longer processing time. Dense Grid maintains uniform point density across all residual fragments, while K-means concentrates centroids in the largest residual areas.
+
+Reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\% (K-means, $T = 1{,}000$) to 90\% ($T = 250$) and 92\% with Dense Grid, as smaller tiles magnify objects in SAM2's internal resolution. Fig.~\ref{fig:tilesize_cars} illustrates this on car detection: at $T = 1{,}000$, most cars are absorbed into large segments, while at $T = 250$, 91\% of 259 cars are correctly detected.
 
 \begin{figure}[h!]
     \centering
@@ -397,9 +373,7 @@ Table~\ref{tab:config_quality} reveals that coverage improvements translate dire
     \label{fig:tilesize_cars}
 \end{figure}
 
-Smaller tiles do not universally improve quality. ASA degrades at $T = 250$ on Potsdam-1 (75.8\% $\rightarrow$ 46.0\%) and Plant23 (98.0\% $\rightarrow$ 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile.
-
-Based on these results, the subsequent quality evaluation (Section~\ref{sec:res_quality}) uses Dense Grid with $T = 250$ for BSB-1 (maximizing small-object detection at 24~cm GSD) and Dense Grid with $T = 1{,}000$ for Potsdam-1 and Plant23 (avoiding merge chaining).
+Smaller tiles do not universally improve quality. ASA degrades at $T = 250$ on Potsdam-1 (75.8\% $\rightarrow$ 46.0\%) and Plant23 (98.0\% $\rightarrow$ 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. Processing time ranges from 160~s (single pass, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$, BSB-1), scaling approximately linearly with tile count.
 
 % ----------------------------------------------------------------------------
 \subsection{Boundary Merge}
@@ -501,7 +475,19 @@ Amorphous and elongated features are more challenging. Roads achieve 57.4\% dete
 
 On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99, and crop fields reach 94.6\% with IoU 0.98, despite the MNF false-color composition that differs substantially from SAM2's natural-image training data.
 
-Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic} and Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}. SLIC is configured with $n_\text{segments}$ matched to RemoteSAMsing; Felzenszwalb scale is calibrated to produce the closest achievable segment count (see caption for parameters and actual counts).
+% ----------------------------------------------------------------------------
+\subsection{Baseline Comparison}
+\label{sec:res_baselines}
+% ----------------------------------------------------------------------------
+
+Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic} and Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}, selected as standard superpixel baselines in the OBIA literature. SLIC is configured with $n_\text{segments}$ matched to RemoteSAMsing; Felzenszwalb scale is calibrated to produce the closest achievable segment count (see caption). Fig.~\ref{fig:baselines_visual} provides a visual comparison on a BSB-1 crop.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.97\textwidth]{figures/fig_baselines_visual.png}
+    \caption{Visual comparison of segmentation methods on BSB-1 (24~cm GSD). A: original image. B: RemoteSAMsing (Dense Grid, $T = 250$) produces segments aligned with individual objects. C: SLIC produces uniform superpixels that cut across object boundaries. D: Felzenszwalb produces irregular segments following spectral gradients rather than object contours.}
+    \label{fig:baselines_visual}
+\end{figure}
 
 \begin{table}[h!]
 \centering
