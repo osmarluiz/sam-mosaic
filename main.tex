@@ -371,7 +371,9 @@ Beyond point strategy, reducing tile size resolves the detection gap. On BSB-1, 
     \label{fig:tilesize_cars}
 \end{figure}
 
-Smaller tiles do not improve quality on all scenes. ASA drops from 75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$ on Potsdam-1, and from 98.0\% to 78.7\% on Plant23, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. The computational cost of smaller tiles is substantial: processing time ranges from 160~s (single pass on 36 tiles, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$ on 1{,}024 tiles, BSB-1), a one-time cost that produces a reusable segmentation layer.
+Smaller tiles do not improve quality on all scenes. ASA drops from 75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$ on Potsdam-1, and from 98.0\% to 78.7\% on Plant23, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. The computational cost of smaller tiles is substantial: processing time ranges from 160~s (single pass on 36 tiles, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$ on 1{,}024 tiles, BSB-1), a one-time cost that produces a reusable segmentation layer. Contextual padding does not increase coverage (BSB-1: 91.5\% with padding vs.\ 93.5\% without; Potsdam-1: 97.1\% vs.\ 98.3\%), as the padding pixels reduce the effective tile area. The primary purpose of padding is boundary quality, evaluated in Section~\ref{sec:res_merge}.
+
+Considering coverage, detection quality, ASA, and processing time, the per-class evaluation in Section~\ref{sec:res_quality} adopts Dense Grid with $T = 250$ for BSB-1 (maximizing small-object detection at 24~cm GSD) and Dense Grid with $T = 1{,}000$ for Potsdam-1 and Plant23 (avoiding merge chaining).
 
 % ----------------------------------------------------------------------------
 \subsection{Boundary Merge}
