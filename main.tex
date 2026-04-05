@@ -149,7 +149,7 @@ The procedure operates as follows. The first pass distributes a uniform $k \time
 \REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, target coverage
 \ENSURE Label map $L$
 \STATE Run SAM2 on $I$ with uniform $k \times k$ point grid at $\tau = \tau_{\text{start}}$
-\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing segments)
+\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing, segments)
 \STATE Compute coverage
 \REPEAT
     \STATE \textsc{Black Mask}: set segmented pixels to $(0, 0, 0)$ in $I$
