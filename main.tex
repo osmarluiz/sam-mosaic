@@ -73,12 +73,10 @@ The problem is compounded by the uniform point grid, which distributes sampling 
 
 This paper presents RemoteSAMsing, an open-source pipeline that addresses both problems to enable SAM2-based unsupervised segmentation of arbitrarily large RS images. Unlike existing approaches that modify the model's architecture or train task-specific prompt generators, RemoteSAMsing operates entirely at inference time with an unmodified SAM2 model. The main contributions are:
 \begin{enumerate}
-    \item A multi-pass segmentation algorithm with black mask focusing and adaptive threshold decay that maximizes image coverage by iteratively targeting unsegmented regions. Ablation experiments quantify the contribution of each component.
-    \item Scene-dependent point sampling strategies (K-means and Dense Grid) that replace the uniform grid with distributions matched to the object size characteristics of different RS scene types. The operator selects the strategy based on scene type, without additional model training.
-    \item A parameter-free boundary merge algorithm using a best-match strategy and Union-Find that reconciles masks across tile boundaries in effectively linear time, producing artifact-free segmentation of arbitrarily large images. Combined with tile-sequential processing, the pipeline maintains constant GPU memory usage regardless of input size.
+    \item A multi-pass segmentation algorithm with black mask focusing and adaptive threshold decay that maximizes coverage while preserving segment quality. The black mask redirects SAM2's attention to residual unsegmented areas across successive passes, and the adaptive decay relaxes quality thresholds only when coverage progress stagnates, avoiding the quality degradation that occurs when a single permissive threshold is used from the start.
+    \item A parameter-free boundary merge algorithm using a best-match strategy and Union-Find that reconciles masks across tile boundaries in linear time, producing spatially consistent segmentation of arbitrarily large images with constant GPU memory usage.
+    \item A comprehensive evaluation across seven scenes spanning three spatial resolutions (5~cm to 4.78~m), two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural). The evaluation provides scene-dependent configuration guidelines, reveals that tile size functions as an implicit scale parameter controlling a coverage-quality trade-off, and demonstrates that RemoteSAMsing segments achieve higher IoU than SLIC and Felzenszwalb baselines on every evaluated class without domain-specific training.
 \end{enumerate}
-
-The pipeline is evaluated across three sensors, three spatial resolutions (5~cm to 4.78~m), two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural).
 
 The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews SAM and its adoption in RS, as well as existing approaches for processing large images. Section~\ref{sec:methodology} describes the RemoteSAMsing pipeline. Section~\ref{sec:experiments} details the study areas, implementation, and evaluation metrics. Section~\ref{sec:results} presents the experimental results, Section~\ref{sec:discussion} discusses their implications, and Section~\ref{sec:conclusion} concludes the paper.
 
@@ -149,7 +147,7 @@ The procedure operates as follows. The first pass distributes a uniform $k \time
 \REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, target coverage
 \ENSURE Label map $L$
 \STATE Run SAM2 on $I$ with uniform $k \times k$ point grid at $\tau = \tau_{\text{start}}$
-\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing, segments)
+\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing segments)
 \STATE Compute coverage
 \REPEAT
     \STATE \textsc{Black Mask}: set segmented pixels to $(0, 0, 0)$ in $I$
