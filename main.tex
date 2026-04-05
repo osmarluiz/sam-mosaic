@@ -428,7 +428,7 @@ All quality results in Section~\ref{sec:res_quality} use the best-match merge wi
 \label{sec:res_quality}
 % ----------------------------------------------------------------------------
 
-This section evaluates the final output at the recommended configurations determined in Section~\ref{sec:res_config}: Dense Grid $T = 250$ for BSB-1 and Dense Grid $T = 1{,}000$ for Potsdam-1 and Plant23. RemoteSAMsing covers 88--98\% of image pixels; the remaining 2--12\% are penalized as background (``Other'' class) in ASA computation and as missed objects in per-object evaluation. SLIC and Felzenszwalb cover 100\% of pixels by design.
+This section evaluates the final output at the recommended configurations from Section~\ref{sec:res_config}: Dense Grid $T = 250$ for BSB-1 and Dense Grid $T = 1{,}000$ for Potsdam-1 and Plant23. RemoteSAMsing covers 88--98\% of image pixels; the remaining 2--12\% are penalized as background (``Other'' class) in ASA computation and as missed objects in per-object evaluation.
 
 Table~\ref{tab:perobject} presents per-class detection rate, IoU, ASA, and mean segments per object ($\bar{n}$) for RemoteSAMsing on all evaluated classes.
 
@@ -469,11 +469,11 @@ Dataset & Class & $n$ & Det.\ (\%) & IoU & ASA (\%) & $\bar{n}$ \\
 \end{tabular}
 \end{table}
 
-Objects with well-defined shape and spectral contrast achieve high detection rates and IoU. Buildings (94.7--96.2\% detection, IoU 0.82--0.88), cars (81.3--96.9\%, IoU 0.79--0.83), agricultural fields (94.6--100\%, IoU 0.98--0.99), and trees with distinct canopies (95.7\% on BSB-1, IoU 0.94) are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On BSB-1, tile size is the primary lever for small-object detection: car detection increases from 40.9\% at $T = 1{,}000$ to 81.3\% at $T = 250$ (Fig.~\ref{fig:tilesize_cars}).
+Objects with well-defined shape and spectral contrast achieve high detection rates and IoU. Buildings (94.7--96.2\% detection, IoU 0.82--0.88), cars (81.3--96.9\%, IoU 0.79--0.83), agricultural fields (94.6--100\%, IoU 0.98--0.99), and trees with distinct canopies (95.7\% on BSB-1, IoU 0.94) are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence.
 
-Amorphous and elongated features are more challenging. Roads achieve 57.4\% detection with $\bar{n} = 30.1$, as these elongated structures span multiple tiles and are fragmented by the tile-based approach. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) lack distinct spectral or spatial boundaries for SAM2 to anchor on.
+Amorphous and elongated features are more challenging. Roads achieve 57.4\% detection with $\bar{n} = 30.1$, as these elongated structures span multiple tiles and are fragmented by the tile-based approach. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) lack distinct boundaries for SAM2 to anchor on. Tree detection varies by resolution: 95.7\% on BSB-1 (24~cm, distinct canopies) vs.\ 67.1\% on Potsdam-1 (5~cm, contiguous canopy).
 
-On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99, and crop fields reach 94.6\% with IoU 0.98, despite the MNF false-color composition that differs substantially from SAM2's natural-image training data.
+On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99, and crop fields reach 94.6\% with IoU 0.98, despite the MNF false-color composition.
 
 % ----------------------------------------------------------------------------
 \subsection{Baseline Comparison}
@@ -528,13 +528,13 @@ Dataset & Class & Det. & IoU & ASA & Det. & IoU & ASA & Det. & IoU & ASA \\
 \end{tabular}
 \end{table}
 
-RemoteSAMsing achieves the highest IoU on all 17 evaluated classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18). SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating that detected objects are poorly delineated; on Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb achieves 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05, because this dominant class is assigned as the majority label to most large segments regardless of boundary accuracy.
+RemoteSAMsing achieves the highest IoU on all 17 evaluated classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18).
 
-On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%). This results from the merge chaining effect described in Section~\ref{sec:res_ablation}: SLIC produces independent superpixels without tile boundary artifacts. Per-class metrics show RemoteSAMsing outperforms SLIC on every class (building IoU 0.88 vs.\ 0.75, car IoU 0.83 vs.\ 0.51).
+SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, as uniform superpixels cannot adapt to small object boundaries. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%) due to the absence of merge chaining artifacts (Section~\ref{sec:res_ablation}), but per-class metrics show RemoteSAMsing outperforms SLIC on every class.
 
-Processing time differs substantially across methods: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 1{,}400--5{,}700~s at $T = 1{,}000$ (up to 50{,}000~s at $T = 250$). Per-tile processing time ranges from 22 to 64~s, and GPU memory usage remains constant regardless of image size.
+Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating poor boundary alignment with objects. On Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb achieves 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05, because this dominant class is assigned as the majority label to most large segments regardless of boundary accuracy.
 
-Across all three datasets spanning 5~cm to 4.78~m GSD, RemoteSAMsing achieves the highest per-object IoU on every evaluated class while maintaining 76--98\% global ASA.
+Processing time differs substantially: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 1{,}400--5{,}700~s at $T = 1{,}000$. Across all three datasets, RemoteSAMsing achieves the highest per-object IoU on every evaluated class.
 
 % ============================================================================
 \section{Discussion}
