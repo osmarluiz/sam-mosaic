@@ -291,7 +291,7 @@ Following established object-based evaluation protocols \citep{clinton2010segmen
 \label{sec:results}
 % ============================================================================
 
-Fig.~\ref{fig:full_segmentation} presents the complete output for all three datasets with ground truth. At the recommended configuration per dataset (Dense Grid, $T = 250$ for BSB-1 and $T = 1{,}000$ for the others), RemoteSAMsing produces 27{,}427 segments at 97.8\% pixel coverage on BSB-1 (24~cm GSD), 2{,}388 segments at 97.1\% on Potsdam-1 (5~cm GSD), and 3{,}530 segments at 99.4\% on Plant23 (4.78~m GSD, MNF false-color).
+Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth, illustrating the coverage and granularity achievable across different spatial resolutions and landscape types.
 
 \begin{figure}[p]
     \centering
@@ -371,9 +371,7 @@ Beyond point strategy, reducing tile size resolves the detection gap. On BSB-1, 
     \label{fig:tilesize_cars}
 \end{figure}
 
-Smaller tiles do not improve quality on all scenes. ASA drops from 75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$ on Potsdam-1, and from 98.0\% to 78.7\% on Plant23, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile.
-
-Processing time ranges from 160~s (single pass on 36 tiles, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$ on 1{,}024 tiles, BSB-1).
+Smaller tiles do not improve quality on all scenes. ASA drops from 75.8\% at $T = 1{,}000$ to 46.0\% at $T = 250$ on Potsdam-1, and from 98.0\% to 78.7\% on Plant23, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. The computational cost of smaller tiles is substantial: processing time ranges from 160~s (single pass on 36 tiles, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$ on 1{,}024 tiles, BSB-1), a one-time cost that produces a reusable segmentation layer.
 
 % ----------------------------------------------------------------------------
 \subsection{Boundary Merge}
@@ -426,7 +424,7 @@ Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary 
 \label{sec:res_quality}
 % ----------------------------------------------------------------------------
 
-This section evaluates the final output at the recommended configurations from Section~\ref{sec:res_config}: Dense Grid $T = 250$ for BSB-1 and Dense Grid $T = 1{,}000$ for Potsdam-1 and Plant23. RemoteSAMsing covers 97--98\% of image pixels at the recommended configurations; the remaining 2--3\% are penalized as background (``Other'' class) in ASA computation and as missed objects in per-object evaluation.
+Based on the configuration analysis in Section~\ref{sec:res_config}, this section evaluates Dense Grid $T = 250$ for BSB-1 (27{,}427 segments, 97.8\% pixel coverage), Dense Grid $T = 1{,}000$ for Potsdam-1 (2{,}388 segments, 97.1\%), and Dense Grid $T = 1{,}000$ for Plant23 (3{,}530 segments, 99.4\%). The 2--3\% of uncovered pixels are penalized as background (``Other'' class) in ASA computation and counted as missed objects in per-object evaluation.
 
 Per-class evaluation reveals that detection quality varies with object morphology (Table~\ref{tab:perobject}).
 
@@ -469,7 +467,7 @@ Dataset & Class & $n$ & Det.\ (\%) & IoU & ASA (\%) & $\bar{n}$ \\
 
 Objects with well-defined shape and spectral contrast achieve high detection rates. Buildings reach 94.7--96.2\% detection (IoU 0.82--0.88), cars 81.3--96.9\% (IoU 0.79--0.83), and agricultural fields 94.6--100\% (IoU 0.98--0.99). These classes are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99 despite the MNF false-color composition.
 
-Amorphous and elongated features achieve lower detection rates. Roads reach 57.4\% detection with $\bar{n} = 30.1$, fragmented across multiple tiles. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) fall below the dataset average. Tree detection varies by resolution: 95.7\% on BSB-1 (24~cm, distinct canopies) vs.\ 67.1\% on Potsdam-1 (5~cm, contiguous canopy).
+Detection drops for amorphous and elongated features. Roads, the most challenging class, reach only 57.4\% detection with $\bar{n} = 30.1$, fragmented across multiple tiles. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) fall below the dataset average. Tree detection varies by resolution: 95.7\% on BSB-1 (24~cm, distinct canopies) vs.\ 67.1\% on Potsdam-1 (5~cm, contiguous canopy).
 
 % ----------------------------------------------------------------------------
 \subsection{Baseline Comparison}
@@ -526,7 +524,7 @@ Dataset & Class & Det. & IoU & ASA & Det. & IoU & ASA & Det. & IoU & ASA \\
 
 RemoteSAMsing achieves the highest IoU on all 17 evaluated classes across all three datasets. The gap is largest on trees (IoU 0.94 vs.\ 0.61 SLIC and 0.21 Felzenszwalb on BSB-1) and crop fields (0.98 vs.\ 0.70 and 0.18).
 
-SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%) because SLIC produces independent superpixels without tile boundary artifacts (Section~\ref{sec:disc_ground_coverage} discusses this limitation). Per-class IoU nevertheless shows RemoteSAMsing outperforming SLIC on every individual class.
+SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1. SLIC also produces high over-segmentation for large objects: $\bar{n} = 66.9$ for roads and $\bar{n} = 271.6$ for lakes on BSB-1. On Potsdam-1, SLIC achieves higher global ASA (78.9\%) than RemoteSAMsing (75.8\%). This 3.1~pp deficit reflects the cost of tile-based processing: boundary merge artifacts penalize ASA even when per-class IoU is higher for every individual class (Section~\ref{sec:disc_ground_coverage}).
 
 Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating poor boundary alignment. On Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb reaches 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05: impervious surfaces dominate the scene, and most large segments receive this class as their majority label regardless of boundary accuracy. Processing time varies widely: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 564--13{,}065~s at $T = 1{,}000$ (Table~\ref{tab:config}).
 
