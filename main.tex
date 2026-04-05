@@ -291,9 +291,7 @@ Following established object-based evaluation protocols \citep{clinton2010segmen
 \label{sec:results}
 % ============================================================================
 
-Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth, providing a visual overview of the results quantified in the following subsections. BSB-1 (24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage, Potsdam-1 (5~cm GSD) into 2{,}388 segments at 97.1\%, and Plant23 (4.78~m GSD, MNF false-color) into 3{,}530 segments at 99.4\%.
-
-The evaluation proceeds in four stages. Section~\ref{sec:res_config} analyzes pipeline configuration through component ablation, point strategy comparison, and tile size variation, reporting both coverage and detection quality. Section~\ref{sec:res_merge} validates the boundary merge algorithm. Section~\ref{sec:res_quality} presents per-class segmentation quality at the recommended configuration. Section~\ref{sec:res_baselines} compares against traditional baselines.
+Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth. BSB-1 (24~cm GSD) is segmented into 27{,}427 segments at 97.8\% coverage, Potsdam-1 (5~cm GSD) into 2{,}388 segments at 97.1\%, and Plant23 (4.78~m GSD, MNF false-color) into 3{,}530 segments at 99.4\%.
 
 \begin{figure}[p]
     \centering
@@ -307,7 +305,7 @@ The evaluation proceeds in four stages. Section~\ref{sec:res_config} analyzes pi
 \label{sec:res_config}
 \label{sec:res_ablation}
 
-Table~\ref{tab:config} presents the pipeline configuration analysis across 15 configurations, reporting coverage, processing time, weighted mean detection rate (mDet), and Achievable Segmentation Accuracy (ASA) for each. Configurations are organized in three groups: single-pass baselines, multi-pass component ablation with both point strategies, and tile size variation.
+Pipeline configuration affects coverage and detection quality in different, sometimes opposing, directions (Table~\ref{tab:config}).
 
 \begin{table}[h!]
 \centering
@@ -353,7 +351,7 @@ Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30
 
 The full pipeline (K-means, $T = 1{,}000$) raises coverage to 89--98\%. Adaptive threshold decay is the largest single contributor: fixing the threshold at $\tau = 0.86$ reduces coverage by 13.9~pp on average. The black mask adds 8.6~pp and produces a counterintuitive result: removing it makes processing 14\% \textit{slower} on BSB-1 (2{,}614~s vs.\ 2{,}293~s) despite achieving \textit{lower} coverage (78.3\% vs.\ 89.0\%). Without the black mask, SAM2 repeatedly generates masks for already-segmented regions without coverage progress. Contextual padding contributes less than 1~pp to coverage; its effect on boundary quality is evaluated in Section~\ref{sec:res_merge}.
 
-Table~\ref{tab:config} reveals a nuance: at $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). The additional segments from late multi-pass iterations, generated at relaxed thresholds, cover residual areas with large imprecise segments that fail the per-object detection protocol. On BSB-1, 53\% of cars (929 of 1{,}717) are covered by such segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
+At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask configuration (89\% vs.\ 78\% on BSB-1) but lower mDet (63\% vs.\ 76\%). The additional segments from late multi-pass iterations, generated at relaxed thresholds, cover residual areas with large imprecise segments that fail the per-object detection protocol. On BSB-1, 53\% of cars (929 of 1{,}717) are covered by such segments but not detected. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
 \begin{figure}[h!]
     \centering
@@ -373,14 +371,16 @@ Reducing tile size resolves the detection gap. On BSB-1, mDet increases from 63\
     \label{fig:tilesize_cars}
 \end{figure}
 
-Smaller tiles do not universally improve quality. ASA degrades at $T = 250$ on Potsdam-1 (75.8\% $\rightarrow$ 46.0\%) and Plant23 (98.0\% $\rightarrow$ 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. Processing time ranges from 160~s (single pass, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$, BSB-1), scaling approximately linearly with tile count.
+Smaller tiles do not universally improve quality. ASA degrades at $T = 250$ on Potsdam-1 (75.8\% $\rightarrow$ 46.0\%) and Plant23 (98.0\% $\rightarrow$ 78.7\%). At 5~cm GSD, a $250 \times 250$~pixel tile covers only $12.5 \times 12.5$~m, often containing a single homogeneous surface. The merge algorithm chains these single-segment tiles into mega-segments. This effect does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile.
+
+Processing time ranges from 160~s (single pass, Potsdam-1) to 66{,}253~s (Dense Grid $T = 250$, BSB-1), scaling approximately linearly with tile count. GPU memory remains constant regardless of image size, as only one tile is loaded at a time.
 
 % ----------------------------------------------------------------------------
 \subsection{Boundary Merge}
 \label{sec:res_merge}
 % ----------------------------------------------------------------------------
 
-Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The naive baseline merges all segment pairs sharing contact across a tile boundary, propagating merges transitively through Union-Find. In the BSB-1 example, multiple buildings and vegetation areas are fused into a single segment spanning the tile corner. In the Potsdam-1 example, 83\% of the crop becomes a single mega-segment. The best-match strategy requires each segment to commit to exactly one merge partner, the neighbor with the highest contact area, avoiding these spurious fusions.
+Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The naive baseline merges all segment pairs sharing contact across a tile boundary, propagating merges transitively through Union-Find. On BSB-1, the naive approach fuses multiple buildings and vegetation areas into a single segment spanning the tile corner; on Potsdam-1, 83\% of the crop collapses into a single mega-segment. The best-match strategy requires each segment to commit to exactly one merge partner, the neighbor with the highest contact area, avoiding these spurious fusions.
 
 \begin{figure}[h!]
     \centering
@@ -389,7 +389,7 @@ Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The nai
     \label{fig:merge}
 \end{figure}
 
-Table~\ref{tab:merge_strategy} quantifies this across all scenes. Best-match merge produces 10--20\% fewer merges than naive, preserving 3--7\% more distinct segments.
+Best-match merge produces 10--20\% fewer merges than naive across all seven scenes, preserving 3--7\% more distinct segments (Table~\ref{tab:merge_strategy}). The largest absolute gain occurs on BSB-2, where best-match preserves 401 additional segments.
 
 \begin{table}[h!]
 \centering
@@ -421,8 +421,6 @@ Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary 
     \label{fig:padding}
 \end{figure}
 
-All quality results in Section~\ref{sec:res_quality} use the best-match merge with contextual padding.
-
 % ----------------------------------------------------------------------------
 \subsection{Segmentation Quality}
 \label{sec:res_quality}
@@ -430,7 +428,7 @@ All quality results in Section~\ref{sec:res_quality} use the best-match merge wi
 
 This section evaluates the final output at the recommended configurations from Section~\ref{sec:res_config}: Dense Grid $T = 250$ for BSB-1 and Dense Grid $T = 1{,}000$ for Potsdam-1 and Plant23. RemoteSAMsing covers 97--98\% of image pixels at the recommended configurations; the remaining 2--3\% are penalized as background (``Other'' class) in ASA computation and as missed objects in per-object evaluation.
 
-Table~\ref{tab:perobject} presents per-class detection rate, IoU, ASA, and mean segments per object ($\bar{n}$) for RemoteSAMsing on all evaluated classes.
+Per-class evaluation reveals that detection quality depends strongly on object morphology (Table~\ref{tab:perobject}).
 
 \begin{table}[h!]
 \centering
@@ -469,18 +467,16 @@ Dataset & Class & $n$ & Det.\ (\%) & IoU & ASA (\%) & $\bar{n}$ \\
 \end{tabular}
 \end{table}
 
-Objects with well-defined shape and spectral contrast achieve high detection rates and IoU. Buildings (94.7--96.2\% detection, IoU 0.82--0.88), cars (81.3--96.9\%, IoU 0.79--0.83), agricultural fields (94.6--100\%, IoU 0.98--0.99), and trees with distinct canopies (95.7\% on BSB-1, IoU 0.94) are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence.
+Objects with well-defined shape and spectral contrast achieve high detection rates. Buildings reach 94.7--96.2\% detection (IoU 0.82--0.88), cars 81.3--96.9\% (IoU 0.79--0.83), and agricultural fields 94.6--100\% (IoU 0.98--0.99). These classes are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99 despite the MNF false-color composition.
 
-Amorphous and elongated features are more challenging. Roads achieve 57.4\% detection with $\bar{n} = 30.1$, as these elongated structures span multiple tiles and are fragmented by the tile-based approach. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) lack distinct boundaries for SAM2 to anchor on. Tree detection varies by resolution: 95.7\% on BSB-1 (24~cm, distinct canopies) vs.\ 67.1\% on Potsdam-1 (5~cm, contiguous canopy).
-
-On Plant23, pivot irrigation fields achieve 100\% detection with IoU 0.99, and crop fields reach 94.6\% with IoU 0.98, despite the MNF false-color composition.
+Amorphous and elongated features achieve lower detection rates. Roads reach 57.4\% detection with $\bar{n} = 30.1$, fragmented across multiple tiles. Low vegetation (50.5\%), impervious surfaces (56.3\%), and clutter (ASA 49.3\%) perform consistently below the dataset average. Tree detection varies by resolution: 95.7\% on BSB-1 (24~cm, distinct canopies) vs.\ 67.1\% on Potsdam-1 (5~cm, contiguous canopy).
 
 % ----------------------------------------------------------------------------
 \subsection{Baseline Comparison}
 \label{sec:res_baselines}
 % ----------------------------------------------------------------------------
 
-Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic} and Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}, selected as standard superpixel baselines in the OBIA literature. SLIC is configured with $n_\text{segments}$ matched to RemoteSAMsing; Felzenszwalb scale is calibrated to produce the closest achievable segment count (see caption). Fig.~\ref{fig:baselines_visual} provides a visual comparison on a BSB-1 crop.
+Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic} and Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient} at approximately matched segment counts (see caption for parameters). On BSB-1 (Fig.~\ref{fig:baselines_visual}), RemoteSAMsing produces segments aligned with individual objects, while SLIC and Felzenszwalb cut across or ignore object boundaries.
 
 \begin{figure}[h!]
     \centering
@@ -534,7 +530,7 @@ SLIC fails to detect cars on BSB-1 (0\%) and achieves only 3.5\% on Potsdam-1, a
 
 Felzenszwalb achieves moderate detection rates (44--86\%) but consistently low IoU (0.03--0.57), indicating poor boundary alignment with objects. On Potsdam-1, each building requires $\bar{n} = 23.6$ Felzenszwalb segments for reconstruction. Felzenszwalb achieves 99.5\% per-class ASA on Potsdam-1 impervious surfaces despite IoU of 0.05, because this dominant class is assigned as the majority label to most large segments regardless of boundary accuracy.
 
-Processing time differs substantially: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 564--13{,}065~s at $T = 1{,}000$ depending on scene and strategy (Table~\ref{tab:config}). Across all three datasets, RemoteSAMsing achieves the highest per-object IoU on every evaluated class.
+Processing time varies widely: SLIC completes in 30--70~s, Felzenszwalb in 150--600~s, and RemoteSAMsing in 564--13{,}065~s at $T = 1{,}000$ depending on scene and strategy (Table~\ref{tab:config}).
 
 % ============================================================================
 \section{Discussion}
