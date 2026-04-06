@@ -262,13 +262,14 @@ Tiling & $T$ (tile\_size) & 1{,}000 & Tile side length (pixels) \\
        & $p$ (padding) & 50 & Contextual padding (pixels) \\
 \midrule
 Segmentation & $k$ (points\_per\_side) & 64 & Grid density ($k^2$ points) \\
-             & $t_{\max}$ (max\_passes) & 10 & Maximum passes per tile \\
              & $\text{cov}_{\text{target}}$ & 99\% & Target coverage \\
              & $\tau_{\text{iou}}^{\text{start}}$ / $\tau_{\text{iou}}^{\text{end}}$ & 0.93 / 0.60 & IoU threshold range \\
              & $\tau_{\text{stab}}^{\text{start}}$ / $\tau_{\text{stab}}^{\text{end}}$ & 0.93 / 0.60 & Stability threshold range \\
              & $\Delta$ (step) & 0.01 & Threshold decay step \\
+             & Stagnation threshold & 0.1 pp & Min.\ coverage gain to keep $\tau$ \\
+             & Overlap rejection & 50\% & Max.\ overlap with existing segments \\
 \midrule
-Merge & --- & best\_match & Merge strategy (parameter-free) \\
+Merge & Strategy & best\_match & Parameter-free best-match \\
       & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
       & merge\_enclosed\_max & 500 & Max.\ area for enclosed absorption \\
 \bottomrule
@@ -280,11 +281,11 @@ Merge & --- & best\_match & Merge strategy (parameter-free) \\
 
 The evaluation examines three aspects of RemoteSAMsing: the contribution of each pipeline component to coverage, the effect of point sampling strategy and tile size across scene types, and the quality of the generated segments relative to ground truth.
 
-Multiple configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.86$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Four pipeline variants compare the full RemoteSAMsing configuration against versions with one component disabled: black mask focusing off, adaptive decay off, and contextual padding off. To characterize the coverage-quality trade-off of fixed thresholds, multi-pass inference is evaluated at five fixed values ($\tau \in \{0.93, 0.86, 0.80, 0.70, 0.60\}$) spanning the full decay range. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes.
+Multiple configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.86$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Three pipeline variants, each with one component disabled (black mask focusing off, adaptive decay off, and contextual padding off), are compared against the full configuration. To characterize the coverage-quality trade-off of fixed thresholds, multi-pass inference is evaluated at five fixed values ($\tau \in \{0.93, 0.86, 0.80, 0.70, 0.60\}$) spanning the full decay range. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes.
 
 Both point strategies (K-means and Dense Grid) are compared at the default tile size ($T = 1{,}000$) and at $T \in \{250, 500\}$ on three representative scenes with ground truth (BSB-1, Potsdam-1, Plant23). $T = 1{,}000$ is selected as a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively.
 
-On BSB-1, Potsdam-1, and Plant23, segmentation quality is assessed using two protocols. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} measures global superpixel quality by assigning each segment its majority ground truth class. A greedy oracle protocol evaluates individual GT objects: for each GT polygon, segments are greedily added to maximize IoU between the merged reconstruction and the GT object, providing a parameter-free upper bound on per-object reconstruction quality. Section~\ref{sec:exp_metrics} defines the resulting metrics.
+On BSB-1, Potsdam-1, and Plant23, segmentation quality is assessed using Achievable Segmentation Accuracy (ASA) for global superpixel quality and a greedy oracle protocol for per-object reconstruction quality. Section~\ref{sec:exp_metrics} defines both protocols and the resulting metrics.
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
@@ -293,7 +294,7 @@ Coverage (\%) is the primary metric, defined as the percentage of image pixels a
 
 Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} measures global superpixel quality by assigning each segment the GT class label that covers the majority of its pixels. ASA is the fraction of GT pixels whose segment received the correct class label: 100\% indicates every segment lies entirely within a single GT class. For BSB-1 and Plant23, unannotated background is treated as a separate ``Other'' class to ensure all pixels contribute to the metric. ASA is reported globally and per class.
 
-The object-level protocol uses a greedy oracle procedure to evaluate how well each GT object can be reconstructed from the segmentation output. For each GT polygon, the algorithm identifies all segments that overlap it and iteratively selects the segment that maximizes the intersection-over-union (IoU) between the accumulated merged region and the GT polygon. Selection stops when no remaining segment improves IoU. This greedy oracle is parameter-free: unlike filter-based protocols that require a threshold on minimum segment overlap \citep{clinton2010segmentation_eval}, the oracle considers all overlapping segments and produces an upper bound on the IoU achievable by any subset selection. Detection rate (\%) is the proportion of GT objects for which the greedy oracle achieves IoU $> 0$. Mean segments per object ($\bar{n}$) quantifies over-segmentation: a building reconstructed from five segments has $\bar{n} = 5$. Weighted mean detection rate (mDet, \%) averages detection rate across classes, weighted by the number of GT instances per class. All results are deterministic: given the same input and configuration, the pipeline produces identical output.
+The object-level protocol uses a greedy oracle procedure to evaluate how well each GT object can be reconstructed from the segmentation output. For each GT polygon, the algorithm identifies all segments that overlap it and iteratively selects the segment that maximizes the intersection-over-union (IoU) between the accumulated merged region and the GT polygon. Selection stops when no remaining segment improves IoU. This greedy oracle is parameter-free: unlike filter-based protocols that require a threshold on minimum segment overlap \citep{clinton2010segmentation_eval}, the oracle considers all overlapping segments and greedily approximates the best achievable IoU. Detection rate (\%) is the proportion of GT objects for which the greedy oracle achieves IoU $> 0$. Mean segments per object ($\bar{n}$) quantifies over-segmentation: a building reconstructed from five segments has $\bar{n} = 5$. Weighted mean detection rate (mDet, \%) averages detection rate across classes, weighted by the number of GT instances per class. All results are deterministic: given the same input and configuration, the pipeline produces identical output.
 
 % ============================================================================
 \section{Results}
