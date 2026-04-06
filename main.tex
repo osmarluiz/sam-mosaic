@@ -142,7 +142,7 @@ RemoteSAMsing addresses two problems. First, SAM2's single-pass inference leaves
 
 SAM2's Automatic Mask Generator (AMG) processes each input point independently and returns all masks that exceed the quality thresholds in a single forward pass. A single pass with high-quality thresholds captures only the most salient objects, leaving a large fraction of the image unsegmented. Lowering the thresholds to compensate introduces noisy, low-quality masks. The multi-pass strategy resolves this tension by iteratively focusing SAM2 on residual unsegmented areas while progressively relaxing quality thresholds only when progress stagnates.
 
-The procedure operates as follows. The first pass distributes a uniform $k \times k$ point grid (default $k = 64$, yielding 4{,}096 points) across the full tile and runs SAM2 at the strictest thresholds ($\tau = 0.93$). Each subsequent pass first applies a black mask to render already-segmented pixels as featureless, then generates new sampling points on the remaining unsegmented area, runs SAM2, and accepts qualifying masks. This continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Three mechanisms work together within this loop: \textit{black mask focusing}, \textit{adaptive threshold decay}, and \textit{per-component mask acceptance}. Algorithm~\ref{alg:multipass} formalizes the complete procedure; each mechanism is described below.
+The first pass runs SAM2's standard AMG on the unmodified tile image with a uniform $k \times k$ point grid (default $k = 64$, yielding 4{,}096 points) at the strictest thresholds ($\tau = 0.93$). From the second pass onward, four mechanisms redirect SAM2 toward residual unsegmented areas: \textit{black mask focusing} renders already-segmented pixels as featureless, \textit{point sampling} generates prompts exclusively on unsegmented areas, \textit{mask acceptance} filters redundant or small masks, and \textit{adaptive threshold decay} relaxes quality thresholds when progress stagnates. The loop continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Algorithm~\ref{alg:multipass} formalizes the complete procedure; the following subsections detail each mechanism.
 
 \begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
@@ -150,35 +150,39 @@ The procedure operates as follows. The first pass distributes a uniform $k \time
 \begin{algorithmic}[1]
 \REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, target coverage
 \ENSURE Label map $L$
-\STATE Run SAM2 on $I$ with uniform $k \times k$ point grid at $\tau = \tau_{\text{start}}$
-\STATE Assign labels to accepted masks (reject if area $< a_{\min}$ or $> 50$\% overlap with existing segments)
-\STATE Compute coverage
+\STATE $\tau \leftarrow \tau_{\text{start}}$
+\STATE Run SAM2 on $I$ with uniform $k \times k$ grid at $\tau$; assign labels; compute coverage
 \REPEAT
-    \STATE \textsc{Black Mask}: set segmented pixels to $(0, 0, 0)$ in $I$
-    \STATE \textsc{Point Sampling}: generate points on residual area (K-means or Dense Grid)
-    \STATE Run SAM2 on masked image with new points at threshold $\tau$
-    \STATE Accept qualifying masks, update labels and coverage
-    \IF{coverage $\geq$ target}
-        \STATE \textbf{stop}
-    \ENDIF
+    \STATE Mask segmented pixels to $(0, 0, 0)$ in $I$
+    \STATE Generate points on residual area (K-means or Dense Grid)
+    \STATE Run SAM2 at $\tau$; accept qualifying masks; update coverage
     \IF{coverage gain $< 0.1$ pp}
-        \STATE \textsc{Adaptive Decay}: reduce $\tau$ by $\Delta$
-        \IF{$\tau < \tau_{\text{end}}$}
-            \STATE \textbf{stop}
-        \ENDIF
+        \STATE $\tau \leftarrow \tau - \Delta$
     \ENDIF
-\UNTIL{maximum passes reached}
+\UNTIL{coverage $\geq$ target \OR $\tau < \tau_{\text{end}}$ \OR max passes reached}
 \RETURN $L$
 \end{algorithmic}
 \end{algorithm}
 
-\textbf{Black mask focusing.} After each pass, all pixels assigned to a segment are set to black $(0, 0, 0)$ in the input image. SAM2 produces few or no mask candidates over uniform black regions, effectively concentrating predictions on the remaining unsegmented areas. Without this mechanism, SAM2 repeatedly generates masks for the same prominent objects across passes, wasting computational budget without increasing coverage. The ablation study (Section~\ref{sec:res_ablation}) quantifies this effect. In principle, setting pixels to $(0,0,0)$ could suppress objects that are naturally very dark; in practice, shadows in optical RS imagery retain non-zero values due to atmospheric scattering, so this collision does not occur at the bit-exact $(0,0,0)$ level.
+\subsubsection{Black Mask Focusing}
+\label{sec:method_blackmask}
 
-\textbf{Adaptive threshold decay.} SAM2's AMG filters masks by two quality scores: predicted IoU ($\tau_{\text{iou}}$) and stability ($\tau_{\text{stab}}$). The initial pass uses high thresholds ($\tau_{\text{iou}}^{\text{start}} = \tau_{\text{stab}}^{\text{start}} = 0.93$), corresponding to the upper range of SAM2's internal quality scores where virtually all accepted masks are spatially coherent. When a pass produces no new masks or coverage gain falls below 0.1 percentage points, both thresholds are reduced by $\Delta = 0.01$. This continues until the thresholds reach $\tau^{\text{end}} = 0.60$, below which SAM2 produces predominantly noisy masks. Threshold relaxation occurs only when progress stagnates, preserving mask quality in earlier passes.
+After each pass, all pixels assigned to a segment are set to black $(0, 0, 0)$ in the input image. SAM2 produces few or no mask candidates over uniform black regions, effectively reducing the visual content available to the model and concentrating predictions on the remaining unsegmented areas. Without this mechanism, SAM2 repeatedly generates masks for the same prominent objects across passes, wasting computational budget without increasing coverage. The ablation study (Section~\ref{sec:res_ablation}) quantifies this effect. The black mask operates on the image seen by SAM2; point sampling (Section~\ref{sec:method_points}) separately ensures that prompt points are placed only on unsegmented areas. These two mechanisms are complementary: even when points target residual areas, SAM2 can generate masks that extend into already-segmented regions, and the black mask prevents this by making those regions visually featureless.
 
-\textbf{Mask acceptance criteria.} Each SAM2 mask may contain disconnected regions. The algorithm splits every mask into 4-connected components and evaluates each independently: components smaller than $a_{\min}$ pixels (default 100) are discarded, and components where 50\% or more of the pixels are already covered by existing segments are rejected as redundant. This per-component evaluation prevents a large mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
+\subsubsection{Point Sampling Strategies}
+\label{sec:method_points}
 
-\textbf{Point sampling strategies.} The first pass uses a uniform grid. For subsequent passes, points must target the residual unsegmented area, which shrinks and fragments as passes accumulate. RemoteSAMsing provides two strategies. \textit{K-means clustering} \citep{arthur2007kmeans} samples up to 10{,}000 coordinates from the residual mask and applies K-means with $k = 64$ clusters; centroids are snapped to valid pixels. The resulting distribution concentrates points in the largest residual areas. \textit{Dense Grid} generates a uniform $k \times k$ grid and discards points on already-segmented pixels. Unlike K-means, Dense Grid maintains uniform density across all residual regions regardless of their size, benefiting scenes with many small scattered objects. Section~\ref{sec:res_ablation} compares both strategies.
+The first pass uses a uniform grid. For subsequent passes, points are generated exclusively on unsegmented areas---pixels already assigned to a segment never receive a prompt point. RemoteSAMsing provides two strategies. \textit{K-means clustering} \citep{arthur2007kmeans} samples up to 10{,}000 coordinates from the residual unsegmented mask and applies K-means with $k = 64$ clusters; centroids are snapped to valid pixels. The resulting distribution concentrates points in the largest residual areas. \textit{Dense Grid} generates a uniform $k \times k$ grid and discards all points that fall on already-segmented pixels. Unlike K-means, Dense Grid maintains uniform density across all residual regions regardless of their size, benefiting scenes with many small scattered objects. Section~\ref{sec:res_ablation} compares both strategies.
+
+\subsubsection{Mask Acceptance Criteria}
+\label{sec:method_acceptance}
+
+Each SAM2 mask may contain disconnected regions. The algorithm splits every mask into 4-connected components and evaluates each independently: components smaller than $a_{\min}$ pixels (default 100) are discarded, and components where 50\% or more of the pixels are already covered by existing segments are rejected as redundant. This per-component evaluation prevents a large mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
+
+\subsubsection{Adaptive Threshold Decay}
+\label{sec:method_threshold}
+
+SAM2's AMG filters masks by two quality scores: predicted IoU ($\tau_{\text{iou}}$) and stability ($\tau_{\text{stab}}$). The initial pass uses high thresholds ($\tau_{\text{iou}}^{\text{start}} = \tau_{\text{stab}}^{\text{start}} = 0.93$), corresponding to the upper range of SAM2's internal quality scores where virtually all accepted masks are spatially coherent. When a pass produces no new masks or coverage gain falls below 0.1 percentage points, both thresholds are reduced by $\Delta = 0.01$. This continues until the thresholds reach $\tau^{\text{end}} = 0.60$, below which SAM2 produces predominantly noisy masks. Threshold relaxation occurs only when progress stagnates, preserving mask quality in earlier passes.
 
 % ----------------------------------------------------------------------------
 \subsection{Scaling to Large Images}
