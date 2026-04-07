@@ -343,7 +343,7 @@ $T = 250$ & 97.8 & 66{,}253 & 89.8 & .568 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4
 
 Pipeline configuration controls a trade-off between coverage and detection quality (Table~\ref{tab:config}). Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image with Det@0.5 of 21--76\%. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%. Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on individual tiles: coverage increases from the first pass to 91--98\% at convergence.
 
-\begin{figure}[htbp]
+\begin{figure}[b]
     \centering
     \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
     \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number.}
