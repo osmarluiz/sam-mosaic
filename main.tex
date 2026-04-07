@@ -301,12 +301,12 @@ The object-level protocol proceeds in two stages. First, a greedy oracle reconst
 \label{sec:results}
 % ============================================================================
 
-Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth, illustrating the coverage and granularity achievable across different spatial resolutions and landscape types. The following subsections first analyze how pipeline configuration (components, point strategy, and tile size) affects coverage and detection quality (Section~\ref{sec:res_config}), then validate the boundary merge algorithm (Section~\ref{sec:res_merge}), evaluate per-class segmentation quality at the best configuration (Section~\ref{sec:res_quality}), and compare against traditional baselines (Section~\ref{sec:res_baselines}).
+Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for all three datasets with ground truth, illustrating the coverage and granularity achievable across different spatial resolutions and landscape types. The following subsections first analyze how pipeline configuration (components and tile size) affects coverage and detection quality (Section~\ref{sec:res_config}), then validate the boundary merge algorithm (Section~\ref{sec:res_merge}), evaluate per-class segmentation quality at the best configuration (Section~\ref{sec:res_quality}), and compare against traditional baselines (Section~\ref{sec:res_baselines}).
 
 \begin{figure}[p]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig2_full_segmentation.png}
-    \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 1{,}000$, 3{,}530 segments, 99.4\% coverage). Segment colors are assigned randomly for visualization.}
+    \caption{Full segmentation results across three datasets. (A)~BSB-1: high-resolution urban scene at 24~cm GSD (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage). Panels A1--A3 show zoom details with segment boundaries. (B)~Potsdam-1: ultra-high-resolution urban scene at 5~cm GSD (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage). (C)~Plant23: agricultural scene at 4.78~m GSD with MNF false-color composition (Dense Grid, $T = 1{,}000$, 4{,}533 segments, 98.1\% coverage). Segment colors are assigned randomly for visualization.}
     \label{fig:full_segmentation}
 \end{figure}
 
@@ -428,7 +428,7 @@ Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary 
 \label{sec:res_quality}
 % ----------------------------------------------------------------------------
 
-Based on the configuration analysis in Section~\ref{sec:res_config}, this section evaluates Dense Grid $T = 250$ for BSB-1 (27{,}427 segments, 97.8\% pixel coverage), Dense Grid $T = 1{,}000$ for Potsdam-1 (2{,}388 segments, 97.1\%), and Dense Grid $T = 1{,}000$ for Plant23 (3{,}530 segments, 99.4\%). The 2--3\% of uncovered pixels are penalized as background (``Other'' class) in ASA computation and counted as missed objects in per-object evaluation. Per-class evaluation reveals that detection quality varies with object morphology (Table~\ref{tab:perobject}).
+Based on the configuration analysis in Section~\ref{sec:res_config}, this section evaluates Dense Grid $T = 250$ for BSB-1 (27{,}427 segments, 97.8\% pixel coverage), Dense Grid $T = 1{,}000$ for Potsdam-1 (2{,}388 segments, 97.1\%), and Dense Grid $T = 1{,}000$ for Plant23 (4{,}533 segments, 98.1\%). The 2--3\% of uncovered pixels are penalized as background (``Other'' class) in ASA computation and counted as missed objects in per-object evaluation. Per-class evaluation reveals that detection quality varies with object morphology (Table~\ref{tab:perobject}).
 
 \begin{table}[h!]
 \centering
