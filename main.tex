@@ -363,7 +363,7 @@ Reducing tile size functions as an implicit scale parameter. On BSB-1, Det@0.5 i
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig4_tilesize.png}
-    \caption{Effect of tile size on small object detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car evaluation. Green: correctly delineated (segment-to-car ratio $< 3\times$). Yellow: mild under-segmentation ($3$--$10\times$). Red: severe under-segmentation ($> 10\times$). Gray: missed (no overlapping segment).}
+    \caption{Effect of tile size on car detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car greedy oracle evaluation. Green: detected (IoU $\geq 0.5$). Yellow: partial segmentation (0.2 $\leq$ IoU $< 0.5$, segment covers a few adjacent cars). Red: coarse segmentation (IoU $< 0.2$, mega-segment covering an entire area). Gray: missed.}
     \label{fig:tilesize_cars}
 \end{figure}
 
