@@ -278,7 +278,7 @@ The evaluation examines three aspects of RemoteSAMsing: the contribution of each
 
 Multiple configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.88$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Two pipeline variants, each with one component disabled (black mask focusing off and adaptive decay off), are compared against the full configuration. The effect of contextual padding is evaluated qualitatively in Section~\ref{sec:res_merge}. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes. SamGeo2 \citep{wu2023samgeo}, which applies SAM2 with default tiling and no multi-pass pipeline, serves as a baseline for SAM2 without the proposed contributions.
 
-Tile size is varied at $T \in \{1{,}000, 500, 250\}$ on the same three scenes. $T = 1{,}000$ is a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively.
+Component ablation is performed at the default tile size ($T = 1{,}000$) to isolate the effect of each component. Tile size variation uses the full pipeline to isolate the effect of spatial scale. Tile size is varied at $T \in \{1{,}000, 500, 250\}$ on the same three scenes. $T = 1{,}000$ is a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively.
 
 On BSB-1, Potsdam-1, and Plant23, segmentation quality is assessed using Achievable Segmentation Accuracy (ASA) for global superpixel quality and a greedy oracle protocol for per-object reconstruction quality. Section~\ref{sec:exp_metrics} defines both protocols and the resulting metrics.
 
@@ -321,17 +321,20 @@ Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for a
 \cmidrule(lr){2-5} \cmidrule(lr){6-9} \cmidrule(lr){10-13}
 Configuration & Cov. & Time & Det & BIoU & Cov. & Time & Det & BIoU & Cov. & Time & Det & BIoU \\
 \midrule
-\multicolumn{13}{l}{\footnotesize\textit{Single pass}} \\[2pt]
+\multicolumn{13}{c}{\footnotesize\textit{Single pass}} \\
+\midrule
 $\tau = 0.93$ & 30.1 & 416 & 21.5 & .083 & 36.5 & 190 & 35.9 & .125 & 68.5 & 671 & 76.3 & .757 \\
 $\tau = 0.88$ (default) & 53.1 & 526 & 51.4 & .199 & 60.8 & 228 & 53.9 & .168 & 81.0 & 619 & 86.7 & .788 \\
 $\tau = 0.70$ & 77.0 & 945 & 74.9 & .287 & 86.1 & 454 & 65.2 & .184 & 93.4 & 1{,}162 & 90.1 & .776 \\
 \midrule
-\multicolumn{13}{l}{\footnotesize\textit{Multi-pass ($T = 1{,}000$)}} \\[2pt]
+\multicolumn{13}{c}{\footnotesize\textit{Multi-pass ablation ($T = 1{,}000$)}} \\
+\midrule
 All components & 91.5 & 13{,}065 & 64.7 & .223 & 97.1 & 2{,}549 & 61.9 & .175 & 98.1 & 3{,}959 & 95.8 & .894 \\
 -- black mask & 80.4 & 11{,}165 & 77.7 & .301 & 87.7 & 3{,}575 & 69.2 & .190 & 94.4 & 4{,}986 & 94.5 & .841 \\
 -- adaptive thr. & 71.8 & 1{,}611 & 65.0 & .243 & 87.6 & 478 & 64.4 & .185 & 95.5 & 1{,}093 & 95.2 & .828 \\
 \midrule
-\multicolumn{13}{l}{\footnotesize\textit{Tile size (all components)}} \\[2pt]
+\multicolumn{13}{c}{\footnotesize\textit{Tile size (all components)}} \\
+\midrule
 $T = 500$ & 96.9 & 24{,}872 & 79.6 & .358 & 98.8 & 5{,}896 & 55.9 & .172 & 99.1 & 6{,}988 & 82.5 & .470 \\
 $T = 250$ & 97.8 & 66{,}253 & 89.8 & .568 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4 & 22{,}252 & 74.6 & .407 \\
 \bottomrule
