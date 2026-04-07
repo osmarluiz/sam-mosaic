@@ -25,7 +25,7 @@
 
 \begin{frontmatter}
 
-\title{RemoteSAMsing: From Segment Anything to Segment Everything}
+\title{Remote SAMsing: From Segment Anything to Segment Everything}
 
 \author[ee]{Osmar Luiz Ferreira de Carvalho}
 \ead{osmarcarvalho@ieee.org}
@@ -44,7 +44,7 @@
 \address[geo]{Department of Geography, University of Bras\'{i}lia, Bras\'{i}lia, Brazil}
 
 \begin{abstract}
-The Segment Anything Model 2 (SAM2) demonstrates strong zero-shot segmentation on natural images, yet remote sensing (RS) images routinely exceed tens of thousands of pixels per dimension, far beyond SAM2's fixed input resolution. A single pass with SAM2's default settings leaves a large fraction of the image unsegmented. This paper presents RemoteSAMsing, an open-source pipeline for unsupervised segmentation of arbitrarily large RS images through three contributions: (1) a multi-pass algorithm with black mask focusing and adaptive threshold decay that increases coverage to 91--98\%; (2) a parameter-free boundary merge that produces spatially consistent mosaics with constant GPU memory; and (3) an experimental analysis revealing that tile size functions as an implicit scale parameter controlling a coverage-detection trade-off. Evaluated on seven scenes spanning 5~cm to 4.78~m GSD, two RGB compositions (natural and MNF false-color), and two landscape types (urban and agricultural), RemoteSAMsing achieves Det@0.5 of 62--96\%, Boundary IoU 2--7$\times$ higher than SLIC and Felzenszwalb baselines, and ASA of 76--99\%. Per-class analysis reveals that SAM2's learned representations transfer well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but show lower performance on amorphous land cover classes, mirroring the things-stuff distinction in panoptic segmentation. RemoteSAMsing achieves these results through pipeline-level innovations---multi-pass processing, boundary merge, and adaptive thresholds---without modifying SAM2's architecture or requiring domain-specific training.
+The Segment Anything Model 2 (SAM2) demonstrates strong zero-shot segmentation on natural images, yet remote sensing (RS) images routinely exceed tens of thousands of pixels per dimension, far beyond SAM2's fixed input resolution. A single pass with SAM2's default settings leaves a large fraction of the image unsegmented. This paper presents Remote SAMsing, an open-source pipeline for unsupervised segmentation of arbitrarily large RS images through three contributions: (1) a multi-pass algorithm with black mask focusing and adaptive threshold decay that increases coverage to 91--98\%; (2) a parameter-free boundary merge that produces spatially consistent mosaics with constant GPU memory; and (3) an experimental analysis revealing that tile size functions as an implicit scale parameter controlling a coverage-detection trade-off. Evaluated on seven scenes spanning 5~cm to 4.78~m GSD, two RGB compositions (natural and MNF false-color), and two landscape types (urban and agricultural), Remote SAMsing achieves Det@0.5 of 62--96\%, Boundary IoU 2--7$\times$ higher than SLIC and Felzenszwalb baselines, and ASA of 76--99\%. Per-class analysis reveals that SAM2's learned representations transfer well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but show lower performance on amorphous land cover classes, mirroring the things-stuff distinction in panoptic segmentation. Remote SAMsing achieves these results through pipeline-level innovations---multi-pass processing, boundary merge, and adaptive thresholds---without modifying SAM2's architecture or requiring domain-specific training.
 \end{abstract}
 
 \begin{keyword}
@@ -66,14 +66,14 @@ Despite this demonstrated transfer, most existing work concentrates on improving
 
 This gap persists because of two difficulties specific to SAM2. First, aerial and satellite sensors produce images spanning thousands to tens of thousands of pixels per dimension, while SAM2 internally resizes all inputs to $1{,}024 \times 1{,}024$. Dividing the image into tiles introduces boundary artifacts: objects that straddle tile edges produce fragmented masks that must be reconciled into a globally consistent segmentation. Second, SAM2's AMG filters masks by predicted IoU and stability score, and a single pass with these filters can leave a large fraction of the image without any mask. The uniform point grid aggravates the coverage problem, distributing sampling density equally regardless of scene content; RS scenes contain objects spanning several orders of magnitude in size, and a fixed grid spacing cannot serve both scales.
 
-This paper presents RemoteSAMsing, an open-source pipeline that addresses both problems to enable SAM2-based unsupervised segmentation of arbitrarily large RS images. Unlike existing approaches that modify the model's architecture or train task-specific prompt generators, RemoteSAMsing introduces pipeline-level innovations around SAM2 without modifying its architecture or requiring training data. The main contributions are:
+This paper presents Remote SAMsing, an open-source pipeline that addresses both problems to enable SAM2-based unsupervised segmentation of arbitrarily large RS images. Unlike existing approaches that modify the model's architecture or train task-specific prompt generators, Remote SAMsing introduces pipeline-level innovations around SAM2 without modifying its architecture or requiring training data. The main contributions are:
 \begin{enumerate}
     \item A multi-pass segmentation algorithm with black mask focusing, adaptive threshold decay, and a Dense Grid point sampling strategy that maximizes coverage while preserving segment quality.
     \item A parameter-free boundary merge algorithm using a best-match strategy and Union-Find that reconciles masks across tile boundaries in linear time, producing spatially consistent segmentation of arbitrarily large images with constant GPU memory usage.
     \item An experimental analysis across seven scenes spanning three spatial resolutions (5~cm to 4.78~m), two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural), revealing that tile size functions as an implicit scale parameter controlling a coverage-detection trade-off.
 \end{enumerate}
 
-The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews SAM and its adoption in RS, as well as existing approaches for processing large images. Section~\ref{sec:methodology} describes the RemoteSAMsing pipeline. Section~\ref{sec:experiments} details the study areas, implementation, and evaluation metrics. Section~\ref{sec:results} presents the experimental results, Section~\ref{sec:discussion} discusses their implications, and Section~\ref{sec:conclusion} concludes the paper.
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews SAM and its adoption in RS, as well as existing approaches for processing large images. Section~\ref{sec:methodology} describes the Remote SAMsing pipeline. Section~\ref{sec:experiments} details the study areas, implementation, and evaluation metrics. Section~\ref{sec:results} presents the experimental results, Section~\ref{sec:discussion} discusses their implications, and Section~\ref{sec:conclusion} concludes the paper.
 
 
 % ============================================================================
@@ -134,7 +134,7 @@ When coverage is high, SAM-based segments function as superpixels for OBIA \cite
 \label{sec:methodology}
 % ============================================================================
 
-RemoteSAMsing addresses two problems. First, SAM2's single-pass inference leaves a substantial fraction of RS images unsegmented; Section~\ref{sec:method_multipass} describes the multi-pass algorithm that maximizes coverage within each tile by iteratively targeting residual unsegmented areas. Second, RS images routinely exceed SAM2's $1{,}024 \times 1{,}024$ input capacity; Section~\ref{sec:method_scaling} describes the tiling scheme, boundary merge algorithm, and post-processing that produce a spatially consistent segmentation of arbitrarily large images.
+Remote SAMsing addresses two problems. First, SAM2's single-pass inference leaves a substantial fraction of RS images unsegmented; Section~\ref{sec:method_multipass} describes the multi-pass algorithm that maximizes coverage within each tile by iteratively targeting residual unsegmented areas. Second, RS images routinely exceed SAM2's $1{,}024 \times 1{,}024$ input capacity; Section~\ref{sec:method_scaling} describes the tiling scheme, boundary merge algorithm, and post-processing that produce a spatially consistent segmentation of arbitrarily large images.
 
 % ----------------------------------------------------------------------------
 \subsection{Multi-Pass Adaptive Segmentation}
@@ -198,7 +198,7 @@ The input image of size $W \times H$ is divided into a regular grid of non-overl
 \subsubsection{Boundary Merge}
 \label{sec:method_merge}
 
-Even with padding, tiles are segmented independently, so the same object may receive different labels in adjacent tiles. A merge step produces a spatially consistent label mosaic. For each tile boundary (horizontal and vertical), the algorithm compares labels on adjacent pixels across the boundary and records the contact count for each pair. Merging all touching pairs would propagate spurious merges: two unrelated segments (e.g., a building and an adjacent road) that share a few pixels of contact at the boundary would be fused. RemoteSAMsing instead employs a parameter-free \textit{best-match} strategy: each segment selects the neighbor with the highest contact count, and only these best-match pairs are retained. This approach handles both 1:1 merges (an object split across two tiles) and $N$:1 merges (an object fragmented on one side but whole on the other), while each segment commits to exactly one merge partner.
+Even with padding, tiles are segmented independently, so the same object may receive different labels in adjacent tiles. A merge step produces a spatially consistent label mosaic. For each tile boundary (horizontal and vertical), the algorithm compares labels on adjacent pixels across the boundary and records the contact count for each pair. Merging all touching pairs would propagate spurious merges: two unrelated segments (e.g., a building and an adjacent road) that share a few pixels of contact at the boundary would be fused. Remote SAMsing instead employs a parameter-free \textit{best-match} strategy: each segment selects the neighbor with the highest contact count, and only these best-match pairs are retained. This approach handles both 1:1 merges (an object split across two tiles) and $N$:1 merges (an object fragmented on one side but whole on the other), while each segment commits to exactly one merge partner.
 
 The merge pairs are processed by a Union-Find structure \citep{tarjan1975union} with path compression, which handles transitive merges implicitly. A lookup table maps each original label to its root, and the entire mosaic is relabeled in a single pass. The total complexity is $O(n \cdot \alpha(n))$, effectively linear in the number of pixels.
 
@@ -274,7 +274,7 @@ Merge & Strategy & best\_match & Parameter-free best-match \\
 \subsection{Experimental Design}
 \label{sec:exp_design}
 
-The evaluation examines three aspects of RemoteSAMsing: the contribution of each pipeline component to coverage, the effect of tile size across scene types, and the quality of the generated segments relative to ground truth.
+The evaluation examines three aspects of Remote SAMsing: the contribution of each pipeline component to coverage, the effect of tile size across scene types, and the quality of the generated segments relative to ground truth.
 
 Multiple configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.88$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Two pipeline variants, each with one component disabled (black mask focusing off and adaptive decay off), are compared against the full configuration. The effect of contextual padding is evaluated qualitatively in Section~\ref{sec:res_merge}. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes. SamGeo2 \citep{wu2023samgeo}, which applies SAM2 with default tiling and no multi-pass pipeline, serves as a baseline for SAM2 without the proposed contributions.
 
@@ -366,7 +366,7 @@ Reducing tile size functions as an implicit scale parameter. On BSB-1, Det@0.5 i
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig4_tilesize.png}
-    \caption{Effect of tile size on car detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car greedy oracle evaluation. Green: detected (IoU $\geq 0.5$). Yellow: partial segmentation (0.2 $\leq$ IoU $< 0.5$, segment covers a few adjacent cars). Red: coarse segmentation (IoU $< 0.2$, mega-segment covering an entire area). Gray: missed.}
+    \caption{Effect of tile size on car detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and Remote SAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car greedy oracle evaluation. Green: detected (IoU $\geq 0.5$). Yellow: partial segmentation (0.2 $\leq$ IoU $< 0.5$, segment covers a few adjacent cars). Red: coarse segmentation (IoU $< 0.2$, mega-segment covering an entire area). Gray: missed.}
     \label{fig:tilesize_cars}
 \end{figure}
 
@@ -431,7 +431,7 @@ Based on the configuration analysis in Section~\ref{sec:res_config}, this sectio
 
 \begin{table}[htbp]
 \centering
-\caption{RemoteSAMsing per-class evaluation (greedy oracle protocol). Det@0.5 = detection rate at IoU $\geq 0.5$ (\%) using greedy oracle reconstruction, SS-Det@0.5 = detection rate using best single segment, mIoU = mean greedy oracle IoU, BIoU = Boundary IoU of merged reconstruction, ASA = per-class Achievable Segmentation Accuracy (\%), $\bar{n}$ = mean segments per object.}
+\caption{Remote SAMsing per-class evaluation (greedy oracle protocol). Det@0.5 = detection rate at IoU $\geq 0.5$ (\%) using greedy oracle reconstruction, SS-Det@0.5 = detection rate using best single segment, mIoU = mean greedy oracle IoU, BIoU = Boundary IoU of merged reconstruction, ASA = per-class Achievable Segmentation Accuracy (\%), $\bar{n}$ = mean segments per object.}
 \label{tab:perobject}
 \scriptsize
 \begin{tabular}{lrrrrrrr}
@@ -487,12 +487,12 @@ Detection drops for amorphous land cover classes. On Potsdam-1, discrete objects
 \label{sec:res_baselines}
 % ----------------------------------------------------------------------------
 
-Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic}, Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}, and SamGeo2 \citep{wu2023samgeo}. SLIC $n_\text{segments}$ is set to approximate RemoteSAMsing's count; Felzenszwalb scale is calibrated similarly (see caption). On BSB-1 (Fig.~\ref{fig:baselines_visual}), RemoteSAMsing produces segments aligned with individual objects, while SLIC and Felzenszwalb cut across or ignore object boundaries.
+Table~\ref{tab:baselines} compares Remote SAMsing against SLIC superpixels \citep{achanta2012slic}, Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}, and SamGeo2 \citep{wu2023samgeo}. SLIC $n_\text{segments}$ is set to approximate Remote SAMsing's count; Felzenszwalb scale is calibrated similarly (see caption). On BSB-1 (Fig.~\ref{fig:baselines_visual}), Remote SAMsing produces segments aligned with individual objects, while SLIC and Felzenszwalb cut across or ignore object boundaries.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig_baselines_visual.png}
-    \caption{Visual comparison of segmentation methods on BSB-1 (24~cm GSD). A: original image. B: RemoteSAMsing ($T = 250$) produces segments aligned with individual objects. C: SLIC produces uniform superpixels that cut across object boundaries. D: Felzenszwalb produces irregular segments following spectral gradients rather than object contours.}
+    \caption{Visual comparison of segmentation methods on BSB-1 (24~cm GSD). A: original image. B: Remote SAMsing ($T = 250$) produces segments aligned with individual objects. C: SLIC produces uniform superpixels that cut across object boundaries. D: Felzenszwalb produces irregular segments following spectral gradients rather than object contours.}
     \label{fig:baselines_visual}
 \end{figure}
 
@@ -503,7 +503,7 @@ Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep
 \scriptsize
 \begin{tabular}{lrrrrrrrrrrrrr}
 \toprule
- & \multicolumn{3}{c}{SamGeo2} & \multicolumn{3}{c}{SLIC} & \multicolumn{3}{c}{Felzenszwalb} & \multicolumn{3}{c}{RemoteSAMsing} \\
+ & \multicolumn{3}{c}{SamGeo2} & \multicolumn{3}{c}{SLIC} & \multicolumn{3}{c}{Felzenszwalb} & \multicolumn{3}{c}{Remote SAMsing} \\
 \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-13}
 Class & Det & IoU & BIoU & Det & IoU & BIoU & Det & IoU & BIoU & Det & IoU & BIoU \\
 \midrule
@@ -539,7 +539,7 @@ Lakes     & 23.3 & .227 & .144 & 35.6 & .464 & .076 & 64.4 & .642 & .226 & \text
 \end{tabular}
 \end{table}
 
-RemoteSAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated classes across all three datasets. The BIoU gap is particularly large: RemoteSAMsing achieves global BIoU of 0.18--0.89, while SLIC (0.06--0.14), Felzenszwalb (0.07--0.16), and SamGeo2 (0.07--0.21) remain consistently below 0.21, indicating that SAM2's learned representations produce boundaries that align much more precisely with object contours.
+Remote SAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated classes across all three datasets. The BIoU gap is particularly large: Remote SAMsing achieves global BIoU of 0.18--0.89, while SLIC (0.06--0.14), Felzenszwalb (0.07--0.16), and SamGeo2 (0.07--0.21) remain consistently below 0.21, indicating that SAM2's learned representations produce boundaries that align much more precisely with object contours.
 
 SamGeo2 achieves only 10--29\% global Det@0.5 across datasets, confirming that SAM2 without multi-pass processing is insufficient for RS segmentation. SLIC produces uniform superpixels that cannot resolve small objects (1.8\% Det@0.5 for cars on BSB-1). Felzenszwalb follows spectral gradients but produces low boundary alignment (global BIoU 0.07--0.16).
 
@@ -554,33 +554,33 @@ SamGeo2 achieves only 10--29\% global Det@0.5 across datasets, confirming that S
 
 The ablation study reveals that coverage and detection quality are governed by different mechanisms. The black mask and adaptive threshold decay together raise coverage from 30--68\% to 91--98\%, but this coverage gain comes partly from large, imprecise segments generated in late passes at relaxed thresholds. These segments cover residual areas but extend beyond individual object footprints, explaining why the full pipeline achieves higher coverage than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) yet lower Det@0.5 (65\% vs.\ 78\%). The black mask is essential not for detection quality but for coverage efficiency: without it, SAM2 wastes passes regenerating masks for already-segmented regions.
 
-SamGeo2's low coverage (6--27\%) demonstrates that SAM2's default AMG is insufficient for RS: without iterative refinement, the majority of the image receives no mask. The multi-pass mechanism, not SAM2 itself, is what achieves near-complete coverage. The conceptual approach is related to iterative elimination strategies for large-scale RS segmentation \citep{shepherd2019large_scale}, but RemoteSAMsing wraps a foundation model in a pipeline that generalizes across scenes without scene-specific parameterization.
+SamGeo2's low coverage (6--27\%) demonstrates that SAM2's default AMG is insufficient for RS: without iterative refinement, the majority of the image receives no mask. The multi-pass mechanism, not SAM2 itself, is what achieves near-complete coverage. The conceptual approach is related to iterative elimination strategies for large-scale RS segmentation \citep{shepherd2019large_scale}, but Remote SAMsing wraps a foundation model in a pipeline that generalizes across scenes without scene-specific parameterization.
 
 \subsection{Scene-Dependent Configuration}
 \label{sec:disc_config}
 
 Tile size $T$ functions as an implicit scale parameter that resolves the coverage-detection tension identified above. Since SAM2 internally resizes all inputs to $1{,}024 \times 1{,}024$ pixels, a $250 \times 250$ tile is upscaled by $4\times$ compared to a $1{,}000 \times 1{,}000$ tile, magnifying small features in the model's feature space. On BSB-1, reducing tile size raises Det@0.5 from 65\% to 90\% and BIoU from 0.22 to 0.56, confirming that the low detection rates at $T = 1{,}000$ result from a scale mismatch rather than a fundamental limitation of SAM2.
 
-This improvement is scene-dependent. On Plant23 (4.78~m GSD), where agricultural fields span thousands of pixels, $T = 1{,}000$ already produces BIoU of 0.89; reducing to $T = 250$ degrades BIoU to 0.40 as tiles contain too little ground area and the merge algorithm chains single-segment tiles into mega-segments. Potsdam-1 (5~cm GSD) is the most challenging scene, with no configuration exceeding 62\% global Det@0.5. A per-class analysis reveals that this low global score is driven by amorphous land cover classes: impervious surfaces (42\% Det@0.5), low vegetation (37\%), and clutter (56\%) lack well-defined contours, while discrete objects---buildings (95\%) and cars (93\%)---achieve detection rates comparable to BSB-1. This pattern mirrors the distinction between ``things'' (countable objects with clear boundaries) and ``stuff'' (amorphous regions) in panoptic segmentation: SAM2 was trained primarily on thing-like objects in natural images, and its learned representations transfer well to discrete RS objects but struggle with continuous land cover classes that have diffuse boundaries. RemoteSAMsing nevertheless achieves the highest detection among all evaluated methods on Potsdam-1, including on stuff classes.
+This improvement is scene-dependent. On Plant23 (4.78~m GSD), where agricultural fields span thousands of pixels, $T = 1{,}000$ already produces BIoU of 0.89; reducing to $T = 250$ degrades BIoU to 0.40 as tiles contain too little ground area and the merge algorithm chains single-segment tiles into mega-segments. Potsdam-1 (5~cm GSD) is the most challenging scene, with no configuration exceeding 62\% global Det@0.5. A per-class analysis reveals that this low global score is driven by amorphous land cover classes: impervious surfaces (42\% Det@0.5), low vegetation (37\%), and clutter (56\%) lack well-defined contours, while discrete objects---buildings (95\%) and cars (93\%)---achieve detection rates comparable to BSB-1. This pattern mirrors the distinction between ``things'' (countable objects with clear boundaries) and ``stuff'' (amorphous regions) in panoptic segmentation: SAM2 was trained primarily on thing-like objects in natural images, and its learned representations transfer well to discrete RS objects but struggle with continuous land cover classes that have diffuse boundaries. Remote SAMsing nevertheless achieves the highest detection among all evaluated methods on Potsdam-1, including on stuff classes.
 
 Across the three datasets, tile configurations covering approximately 50~m or more per side produce stable results. The merge chaining at smaller tiles is a limitation of the boundary-contact-based merge, not of SAM2: the merge cannot distinguish legitimate from spurious merges when tiles are dominated by a single segment. A hierarchical multi-scale approach, applying a coarse pass at $T = 1{,}000$ followed by a targeted fine pass at $T = 250$ only on residual unsegmented areas, could mitigate this limitation.
 
 \subsection{Comparison with Traditional Segmentation Methods}
 \label{sec:disc_baselines}
 
-RemoteSAMsing achieves higher Det@0.5, mIoU, and BIoU than SLIC, Felzenszwalb, and SamGeo2 across all three datasets (Table~\ref{tab:baselines}). The BIoU gap reveals the nature of this advantage: RemoteSAMsing achieves BIoU of 0.17--0.89, while SLIC and Felzenszwalb remain below 0.16. SLIC partitions the image into spectrally uniform regions using k-means clustering, which produces boundaries that follow spectral gradients rather than object contours---a tree canopy is split into multiple superpixels along internal spectral variation, while the boundary between the tree and an adjacent building may fall in the middle of a superpixel. Felzenszwalb merges regions along spectral similarity, producing irregular shapes that respect strong gradients but miss boundaries where adjacent objects share similar spectra. SAM2, trained on over one billion natural image masks, places boundaries based on learned object structure, producing segments that align with objects as perceived by a human observer rather than with spectral discontinuities.
+Remote SAMsing achieves higher Det@0.5, mIoU, and BIoU than SLIC, Felzenszwalb, and SamGeo2 across all three datasets (Table~\ref{tab:baselines}). The BIoU gap reveals the nature of this advantage: Remote SAMsing achieves BIoU of 0.17--0.89, while SLIC and Felzenszwalb remain below 0.16. SLIC partitions the image into spectrally uniform regions using k-means clustering, which produces boundaries that follow spectral gradients rather than object contours---a tree canopy is split into multiple superpixels along internal spectral variation, while the boundary between the tree and an adjacent building may fall in the middle of a superpixel. Felzenszwalb merges regions along spectral similarity, producing irregular shapes that respect strong gradients but miss boundaries where adjacent objects share similar spectra. SAM2, trained on over one billion natural image masks, places boundaries based on learned object structure, producing segments that align with objects as perceived by a human observer rather than with spectral discontinuities.
 
-\subsection{RemoteSAMsing as a Superpixel Generator for OBIA}
+\subsection{Remote SAMsing as a Superpixel Generator for OBIA}
 \label{sec:disc_obia}
 
-RemoteSAMsing produces over-segmentation by design: a single building may be split into roof, shadow, and facade segments. This is consistent with the superpixel paradigm in OBIA, where over-segmentation is preferred over under-segmentation because segments can be merged in downstream classification but cannot be split \citep{blaschke2010obia, benz2004ecognition, baatz2000multiresolution}. The high BIoU values indicate that over-segmentation occurs \textit{within} objects rather than \textit{across} object boundaries---segments do not leak into adjacent classes. This is the fundamental requirement for OBIA: a building split into two segments is acceptable provided neither segment extends into the adjacent road.
+Remote SAMsing produces over-segmentation by design: a single building may be split into roof, shadow, and facade segments. This is consistent with the superpixel paradigm in OBIA, where over-segmentation is preferred over under-segmentation because segments can be merged in downstream classification but cannot be split \citep{blaschke2010obia, benz2004ecognition, baatz2000multiresolution}. The high BIoU values indicate that over-segmentation occurs \textit{within} objects rather than \textit{across} object boundaries---segments do not leak into adjacent classes. This is the fundamental requirement for OBIA: a building split into two segments is acceptable provided neither segment extends into the adjacent road.
 
-ASA \citep{stutz2018superpixels} quantifies this directly. RemoteSAMsing achieves ASA of 97.6\% on BSB-1, 75.8\% on Potsdam-1, and 99.5\% on Plant23, meaning that a downstream classifier assigning each segment its majority class achieves 76--99\% accuracy without additional refinement. The Plant23 result (99.5\% ASA with MNF false-color input) suggests that SAM2's learned representations respond to spatial gradients and textural boundaries rather than spectral semantics, indicating applicability beyond natural RGB compositions.
+ASA \citep{stutz2018superpixels} quantifies this directly. Remote SAMsing achieves ASA of 97.6\% on BSB-1, 75.8\% on Potsdam-1, and 99.5\% on Plant23, meaning that a downstream classifier assigning each segment its majority class achieves 76--99\% accuracy without additional refinement. The Plant23 result (99.5\% ASA with MNF false-color input) suggests that SAM2's learned representations respond to spatial gradients and textural boundaries rather than spectral semantics, indicating applicability beyond natural RGB compositions.
 
 \subsection{Limitations}
 \label{sec:disc_limitations}
 
-SAM2 was trained on natural images and may produce suboptimal segments for data modalities far from its training distribution (e.g., SAR, thermal, hyperspectral) \citep{zhang2025sam2survey}. While the Plant23 results with MNF false-color suggest tolerance to non-natural compositions, performance on truly exotic data remains untested. RemoteSAMsing produces instance-agnostic segments without class labels; downstream classification is required to produce thematic maps, inherent to SAM2's class-agnostic design.
+SAM2 was trained on natural images and may produce suboptimal segments for data modalities far from its training distribution (e.g., SAR, thermal, hyperspectral) \citep{zhang2025sam2survey}. While the Plant23 results with MNF false-color suggest tolerance to non-natural compositions, performance on truly exotic data remains untested. Remote SAMsing produces instance-agnostic segments without class labels; downstream classification is required to produce thematic maps, inherent to SAM2's class-agnostic design.
 
 At 24~cm GSD, small objects such as cars (${\sim}12 \times 12$~pixels) and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit, limiting per-object detection. Roads and other elongated structures that span multiple tiles remain challenging for tile-based approaches, as reflected in the low Det@0.5 (49\%) despite high ASA (95\%) for this class.
 
@@ -593,11 +593,11 @@ As discussed in Section~\ref{sec:disc_config}, tile sizes below $T = 1{,}000$ at
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presented RemoteSAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images. A multi-pass algorithm with black mask focusing and adaptive threshold decay raises coverage from 30--68\% (single-pass SAM2) to 91--98\%, and a parameter-free boundary merge produces spatially consistent mosaics across tile boundaries. Without this pipeline, SAM2 with default tiling (SamGeo2) achieves only 6--27\% coverage.
+This paper presented Remote SAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images. A multi-pass algorithm with black mask focusing and adaptive threshold decay raises coverage from 30--68\% (single-pass SAM2) to 91--98\%, and a parameter-free boundary merge produces spatially consistent mosaics across tile boundaries. Without this pipeline, SAM2 with default tiling (SamGeo2) achieves only 6--27\% coverage.
 
-Across seven scenes spanning 5~cm to 4.78~m GSD, RemoteSAMsing achieves Det@0.5 of 62--96\%, ASA of 76--99\%, and Boundary IoU 2--7$\times$ higher than SLIC and Felzenszwalb baselines. SAM2's learned representations transfer particularly well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but show lower performance on amorphous land cover classes, mirroring the things-stuff distinction in panoptic segmentation. Tile size functions as an implicit scale parameter: reducing $T$ from 1{,}000 to 250 increases Det@0.5 from 65\% to 90\% on BSB-1, but causes merge chaining at high spatial resolutions, establishing a practical minimum ground coverage of approximately 50~m per tile side. The pipeline operates on MNF false-color imagery without retraining, indicating that SAM2 responds to spatial gradients rather than spectral semantics.
+Across seven scenes spanning 5~cm to 4.78~m GSD, Remote SAMsing achieves Det@0.5 of 62--96\%, ASA of 76--99\%, and Boundary IoU 2--7$\times$ higher than SLIC and Felzenszwalb baselines. SAM2's learned representations transfer particularly well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but show lower performance on amorphous land cover classes, mirroring the things-stuff distinction in panoptic segmentation. Tile size functions as an implicit scale parameter: reducing $T$ from 1{,}000 to 250 increases Det@0.5 from 65\% to 90\% on BSB-1, but causes merge chaining at high spatial resolutions, establishing a practical minimum ground coverage of approximately 50~m per tile side. The pipeline operates on MNF false-color imagery without retraining, indicating that SAM2 responds to spatial gradients rather than spectral semantics.
 
-Future work includes fine-tuning SAM2 on RS data to improve performance on stuff classes with diffuse boundaries, integrating RemoteSAMsing segments as input to supervised classifiers for thematic mapping, and developing a hierarchical multi-scale approach that applies fine-resolution processing only to residual unsegmented areas. An improved merge algorithm incorporating spectral similarity could mitigate merge chaining at high spatial resolutions.
+Future work includes fine-tuning SAM2 on RS data to improve performance on stuff classes with diffuse boundaries, integrating Remote SAMsing segments as input to supervised classifiers for thematic mapping, and developing a hierarchical multi-scale approach that applies fine-resolution processing only to residual unsegmented areas. An improved merge algorithm incorporating spectral similarity could mitigate merge chaining at high spatial resolutions.
 
 % ============================================================================
 % References
@@ -610,7 +610,7 @@ Future work includes fine-tuning SAM2 on RS data to improve performance on stuff
 The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
 
 \section*{Data availability}
-The ISPRS Potsdam dataset is publicly available from the ISPRS website. The Bras\'{i}lia and Plant23 datasets are available upon reasonable request. The RemoteSAMsing source code is available at \url{https://github.com/osmarluiz/sam-mosaic}.
+The ISPRS Potsdam dataset is publicly available from the ISPRS website. The Bras\'{i}lia and Plant23 datasets are available upon reasonable request. The Remote SAMsing source code is available at \url{https://github.com/osmarluiz/sam-mosaic}.
 
 \section*{Acknowledgements}
 \todo{Funding sources, computational resources, etc.}
