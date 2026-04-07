@@ -319,7 +319,7 @@ Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for a
 
 \begin{table}[h!]
 \centering
-\caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), detection rate at IoU $\geq 0.5$ (Det@0.5, \%), and Boundary IoU (BIoU) across three scenes. All multi-pass configurations use Dense Grid point sampling. SamGeo2 represents SAM2 with default tiling and no multi-pass pipeline.}
+\caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), detection rate at IoU $\geq 0.5$ (Det@0.5, \%), and Boundary IoU (BIoU) across three scenes. All configurations use Dense Grid point sampling.}
 \label{tab:config}
 \scriptsize
 \begin{tabular}{lrrrrrrrrrrrr}
@@ -341,9 +341,6 @@ Full pipeline & 91.5 & 13{,}065 & 64.7 & .223 & 97.1 & 2{,}549 & 61.9 & .175 & 9
 \multicolumn{13}{l}{\footnotesize\textit{Tile size (full pipeline)}} \\[2pt]
 $T = 500$ & 96.9 & 24{,}872 & 79.6 & .358 & 98.8 & 5{,}896 & 55.9 & .172 & 99.1 & 6{,}988 & 82.5 & .470 \\
 $T = 250$ & 97.8 & 66{,}253 & 89.8 & .568 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4 & 22{,}252 & 74.6 & .407 \\
-\midrule
-\multicolumn{13}{l}{\footnotesize\textit{Baseline}} \\[2pt]
-SamGeo2 & 5.8 & --- & 10.1 & .071 & 9.7 & --- & 20.1 & .083 & 26.5 & --- & 29.2 & .206 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -357,7 +354,7 @@ Pipeline configuration controls a trade-off between coverage and detection quali
     \label{fig:multipass_progression}
 \end{figure}
 
-The full pipeline at $T = 1{,}000$ raises coverage to 91--98\% across all three scenes. Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 3--20~pp (19.7~pp on BSB-1). The black mask adds 4--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions. SamGeo2, which applies SAM2 with default tiling and no multi-pass pipeline, achieves only 6--27\% coverage, confirming that the multi-pass architecture is essential.
+The full pipeline at $T = 1{,}000$ raises coverage to 91--98\% across all three scenes. Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 3--20~pp (19.7~pp on BSB-1). The black mask adds 4--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions. For comparison, SamGeo2 \citep{wu2023samgeo}, which applies SAM2 with default tiling but no multi-pass pipeline, achieves only 6--27\% coverage (Table~\ref{tab:baselines}), confirming that the multi-pass architecture is essential.
 
 At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but lower Det@0.5 (65\% vs.\ 78\%). Late multi-pass iterations at relaxed thresholds generate large segments that cover residual areas but extend beyond individual object footprints, reducing per-object detection. Reducing tile size resolves this trade-off on scenes with small objects. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
