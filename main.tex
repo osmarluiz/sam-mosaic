@@ -357,7 +357,7 @@ Pipeline configuration controls a trade-off between coverage and detection quali
     \label{fig:multipass_progression}
 \end{figure}
 
-The full pipeline at $T = 1{,}000$ raises coverage to 91--98\% across all three scenes. Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 14--20~pp. The black mask adds 7--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions. SamGeo2, which applies SAM2 with default tiling and no multi-pass pipeline, achieves only 6--27\% coverage, confirming that the multi-pass architecture is essential.
+The full pipeline at $T = 1{,}000$ raises coverage to 91--98\% across all three scenes. Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 3--20~pp (19.7~pp on BSB-1). The black mask adds 4--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions. SamGeo2, which applies SAM2 with default tiling and no multi-pass pipeline, achieves only 6--27\% coverage, confirming that the multi-pass architecture is essential.
 
 At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but lower Det@0.5 (65\% vs.\ 78\%). Late multi-pass iterations at relaxed thresholds generate large segments that cover residual areas but extend beyond individual object footprints, reducing per-object detection. Reducing tile size resolves this trade-off on scenes with small objects. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
