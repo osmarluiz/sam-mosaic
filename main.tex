@@ -438,7 +438,8 @@ Based on the configuration analysis in Section~\ref{sec:res_config}, this sectio
 \toprule
 Class & $n$ & Det@0.5 & SS-Det & mIoU & BIoU & ASA & $\bar{n}$ \\
 \midrule
-\multicolumn{8}{l}{\footnotesize\textit{BSB-1 (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage)}} \\[2pt]
+\multicolumn{8}{c}{\footnotesize\textit{BSB-1 (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage)}} \\
+\midrule
 Buildings   & 2{,}055 & 94.0 & 80.1 & 0.807 & 0.329 & 97.3 & 2.6 \\
 Trees       & 5{,}440 & 96.9 & 96.5 & 0.917 & 0.739 & 98.1 & 1.1 \\
 Cars        & 1{,}755 & 75.2 & 75.2 & 0.693 & 0.519 & 83.7 & 1.0 \\
@@ -449,7 +450,8 @@ Lakes       &       8 & 87.5 & 75.0 & 0.740 & 0.427 & 99.6 & 1.4 \\
 Decks       &      10 & 80.0 & 80.0 & 0.718 & 0.434 & 88.7 & 1.0 \\
 \textit{Global} & \textit{10{,}546} & \textit{89.8} & \textit{86.6} & \textit{0.827} & \textit{0.568} & \textit{97.6} & --- \\
 \midrule
-\multicolumn{8}{l}{\footnotesize\textit{Potsdam-1 (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage)}} \\[2pt]
+\multicolumn{8}{c}{\footnotesize\textit{Potsdam-1 (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage)}} \\
+\midrule
 \multicolumn{8}{l}{\scriptsize\textit{Things}} \\
 Building    &      78 & 94.9 & 67.9 & 0.861 & 0.218 & 96.5 & 5.7 \\
 Car         &     257 & 93.0 & 92.6 & 0.818 & 0.346 & 89.0 & 1.0 \\
@@ -460,7 +462,8 @@ Low veg.    &     396 & 36.6 & 32.3 & 0.442 & 0.116 & 76.3 & 1.8 \\
 Clutter     &     279 & 55.6 & 47.3 & 0.550 & 0.207 & 49.3 & 1.5 \\
 \textit{Global} & \textit{1{,}392} & \textit{61.9} & \textit{54.0} & \textit{0.586} & \textit{0.175} & \textit{75.8} & --- \\
 \midrule
-\multicolumn{8}{l}{\footnotesize\textit{Plant23 (Dense Grid, $T = 1{,}000$, 4{,}533 segments, 98.1\% coverage)}} \\[2pt]
+\multicolumn{8}{c}{\footnotesize\textit{Plant23 (Dense Grid, $T = 1{,}000$, 4{,}533 segments, 98.1\% coverage)}} \\
+\midrule
 Pivot irrig. &    508 & 100.0 & 100.0 & 0.996 & 0.979 & 99.7 & 1.0 \\
 Crop fields & 2{,}758 & 95.2 & 94.8 & 0.945 & 0.881 & 99.6 & 1.0 \\
 Lakes       &      73 & 89.0 & 89.0 & 0.888 & 0.773 & 94.0 & 1.2 \\
@@ -499,7 +502,8 @@ Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep
 \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-13}
 Class & Det & IoU & BIoU & Det & IoU & BIoU & Det & IoU & BIoU & Det & IoU & BIoU \\
 \midrule
-\multicolumn{13}{l}{\footnotesize\textit{BSB-1}} \\[2pt]
+\multicolumn{13}{c}{\footnotesize\textit{BSB-1}} \\
+\midrule
 Buildings &  5.2 & .059 & .034 & 76.8 & .634 & .165 & 75.7 & .623 & .191 & \textbf{94.0} & \textbf{.807} & \textbf{.329} \\
 Trees     &  9.0 & .086 & .067 & 62.6 & .554 & .139 & 41.6 & .480 & .103 & \textbf{96.9} & \textbf{.917} & \textbf{.739} \\
 Cars      & 23.1 & .197 & .164 &  1.8 & .308 & .088 & 43.8 & .496 & .303 & \textbf{75.2} & \textbf{.693} & \textbf{.519} \\
@@ -510,7 +514,8 @@ Lakes     & 12.5 & .158 & .082 & 62.5 & .514 & .215 & 50.0 & .461 & .162 & \text
 Decks     &  0.0 & .009 & .008 & 40.0 & .461 & .213 & 40.0 & .450 & .281 & \textbf{80.0} & \textbf{.718} & \textbf{.434} \\
 \textit{Global} & \textit{10.1} & \textit{.095} & \textit{.071} & \textit{51.7} & \textit{.517} & \textit{.127} & \textit{49.1} & \textit{.514} & \textit{.157} & \textit{\textbf{89.8}} & \textit{\textbf{.827}} & \textit{\textbf{.568}} \\
 \midrule
-\multicolumn{13}{l}{\footnotesize\textit{Potsdam-1}} \\[2pt]
+\multicolumn{13}{c}{\footnotesize\textit{Potsdam-1}} \\
+\midrule
 Impervious&  4.9 & .077 & .040 & 20.6 & .368 & .067 &  8.8 & .280 & .051 & \textbf{42.2} & \textbf{.464} & \textbf{.142} \\
 Building  & 26.9 & .280 & .109 & 84.6 & .718 & .127 & 30.8 & .461 & .073 & \textbf{94.9} & \textbf{.861} & \textbf{.218} \\
 Low veg.  &  1.5 & .040 & .021 & 30.6 & .403 & .071 &  2.8 & .271 & .036 & \textbf{36.6} & \textbf{.442} & \textbf{.116} \\
@@ -519,7 +524,8 @@ Car       & 71.2 & .629 & .277 & 40.9 & .476 & .052 & 46.3 & .528 & .105 & \text
 Clutter   & 15.4 & .150 & .066 & 16.1 & .356 & .061 & 22.9 & .398 & .114 & \textbf{55.6} & \textbf{.550} & \textbf{.207} \\
 \textit{Global} & \textit{20.1} & \textit{.196} & \textit{.083} & \textit{40.2} & \textit{.454} & \textit{.063} & \textit{25.4} & \textit{.394} & \textit{.065} & \textit{\textbf{61.9}} & \textit{\textbf{.586}} & \textit{\textbf{.175}} \\
 \midrule
-\multicolumn{13}{l}{\footnotesize\textit{Plant23}} \\[2pt]
+\multicolumn{13}{c}{\footnotesize\textit{Plant23}} \\
+\midrule
 Pivots    & 85.2 & .840 & .601 & 97.4 & .795 & .212 & 92.9 & .662 & .137 & \textbf{100} & \textbf{.996} & \textbf{.979} \\
 Crops     & 19.1 & .189 & .135 & 53.4 & .541 & .128 & 30.9 & .451 & .104 & \textbf{95.2} & \textbf{.945} & \textbf{.881} \\
 Lakes     & 23.3 & .227 & .144 & 35.6 & .464 & .076 & 64.4 & .642 & .226 & \textbf{89.0} & \textbf{.888} & \textbf{.773} \\
