@@ -434,45 +434,47 @@ Based on the configuration analysis in Section~\ref{sec:res_config}, this sectio
 
 \begin{table}[h!]
 \centering
-\caption{RemoteSAMsing per-class evaluation (greedy oracle protocol). Det@0.5 and Det@0.75 = detection rate at IoU $\geq$ threshold (\%), mIoU = mean greedy oracle IoU, BIoU = Boundary IoU, $\bar{n}$ = mean segments per object.}
+\caption{RemoteSAMsing per-class evaluation (greedy oracle protocol). Det@0.5 and Det@0.75 = detection rate at IoU $\geq$ threshold (\%), mIoU = mean greedy oracle IoU, BIoU = Boundary IoU, ASA = per-class Achievable Segmentation Accuracy (\%), $\bar{n}$ = mean segments per object.}
 \label{tab:perobject}
 \scriptsize
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrrrr}
 \toprule
-Class & $n$ & Det@0.5 & Det@0.75 & mIoU & BIoU & $\bar{n}$ \\
+Class & $n$ & Det@0.5 & Det@0.75 & mIoU & BIoU & ASA & $\bar{n}$ \\
 \midrule
-\multicolumn{7}{l}{\footnotesize\textit{BSB-1 (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage, ASA 97.6\%)}} \\[2pt]
-Buildings   & 2{,}055 & 94.0 & 77.1 & 0.807 & 0.285 & 2.6 \\
-Trees       & 5{,}440 & 96.9 & 92.1 & 0.917 & 0.735 & 1.1 \\
-Cars        & 1{,}755 & 75.2 & 59.8 & 0.693 & 0.519 & 1.0 \\
-Pools       & 1{,}157 & 72.8 & 49.3 & 0.673 & 0.302 & 1.1 \\
-Roads       &      68 & 48.5 & 26.5 & 0.446 & 0.144 & 2.6 \\
-Courts      &      53 & 96.2 & 54.7 & 0.760 & 0.213 & 1.2 \\
-Lakes       &       8 & 87.5 & 50.0 & 0.740 & 0.430 & 1.4 \\
-Decks       &      10 & 80.0 & 70.0 & 0.718 & 0.434 & 1.0 \\
-\textit{Global} & \textit{10{,}546} & \textit{89.8} & \textit{78.4} & \textit{0.827} & \textit{0.557} & --- \\
+\multicolumn{8}{l}{\footnotesize\textit{BSB-1 (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage)}} \\[2pt]
+Buildings   & 2{,}055 & 94.0 & 77.1 & 0.807 & 0.285 & 97.3 & 2.6 \\
+Trees       & 5{,}440 & 96.9 & 92.1 & 0.917 & 0.735 & 98.1 & 1.1 \\
+Cars        & 1{,}755 & 75.2 & 59.8 & 0.693 & 0.519 & 83.7 & 1.0 \\
+Pools       & 1{,}157 & 72.8 & 49.3 & 0.673 & 0.302 & 91.1 & 1.1 \\
+Roads       &      68 & 48.5 & 26.5 & 0.446 & 0.144 & 95.2 & 2.6 \\
+Courts      &      53 & 96.2 & 54.7 & 0.760 & 0.213 & 96.7 & 1.2 \\
+Lakes       &       8 & 87.5 & 50.0 & 0.740 & 0.430 & 99.6 & 1.4 \\
+Decks       &      10 & 80.0 & 70.0 & 0.718 & 0.434 & 88.7 & 1.0 \\
+\textit{Global} & \textit{10{,}546} & \textit{89.8} & \textit{78.4} & \textit{0.827} & \textit{0.557} & \textit{97.6} & --- \\
 \midrule
-\multicolumn{7}{l}{\footnotesize\textit{Potsdam-1 (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage, ASA 75.8\%)}} \\[2pt]
-Impervious  &     102 & 42.2 & 11.8 & 0.464 & 0.132 & 2.2 \\
-Building    &      78 & 94.9 & 84.6 & 0.861 & 0.169 & 5.7 \\
-Low veg.    &     396 & 36.6 & 15.9 & 0.442 & 0.109 & 1.8 \\
-Tree        &     280 & 73.2 & 19.6 & 0.582 & 0.066 & 2.4 \\
-Car         &     257 & 93.0 & 81.7 & 0.818 & 0.344 & 1.0 \\
-Clutter     &     279 & 55.6 & 27.2 & 0.550 & 0.195 & 1.5 \\
-\textit{Global} & \textit{1{,}392} & \textit{61.9} & \textit{34.6} & \textit{0.586} & \textit{0.166} & --- \\
+\multicolumn{8}{l}{\footnotesize\textit{Potsdam-1 (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage)}} \\[2pt]
+\multicolumn{8}{l}{\scriptsize\textit{Things}} \\
+Building    &      78 & 94.9 & 84.6 & 0.861 & 0.169 & 96.5 & 5.7 \\
+Car         &     257 & 93.0 & 81.7 & 0.818 & 0.344 & 89.0 & 1.0 \\
+Tree        &     280 & 73.2 & 19.6 & 0.582 & 0.066 & 52.2 & 2.4 \\
+\multicolumn{8}{l}{\scriptsize\textit{Stuff}} \\
+Impervious  &     102 & 42.2 & 11.8 & 0.464 & 0.132 & 74.7 & 2.2 \\
+Low veg.    &     396 & 36.6 & 15.9 & 0.442 & 0.109 & 76.3 & 1.8 \\
+Clutter     &     279 & 55.6 & 27.2 & 0.550 & 0.195 & 49.3 & 1.5 \\
+\textit{Global} & \textit{1{,}392} & \textit{61.9} & \textit{34.6} & \textit{0.586} & \textit{0.166} & \textit{75.8} & --- \\
 \midrule
-\multicolumn{7}{l}{\footnotesize\textit{Plant23 (Dense Grid, $T = 1{,}000$, 4{,}533 segments, 98.1\% coverage, ASA 99.5\%)}} \\[2pt]
-Pivot irrig. &    508 & 100.0 & 99.6 & 0.996 & 0.979 & 1.0 \\
-Crop fields & 2{,}758 & 95.2 & 91.9 & 0.945 & 0.880 & 1.0 \\
-Lakes       &      73 & 89.0 & 82.2 & 0.888 & 0.771 & 1.2 \\
-\textit{Global} & \textit{3{,}339} & \textit{95.8} & \textit{92.8} & \textit{0.951} & \textit{0.893} & --- \\
+\multicolumn{8}{l}{\footnotesize\textit{Plant23 (Dense Grid, $T = 1{,}000$, 4{,}533 segments, 98.1\% coverage)}} \\[2pt]
+Pivot irrig. &    508 & 100.0 & 99.6 & 0.996 & 0.979 & 99.7 & 1.0 \\
+Crop fields & 2{,}758 & 95.2 & 91.9 & 0.945 & 0.880 & 99.6 & 1.0 \\
+Lakes       &      73 & 89.0 & 82.2 & 0.888 & 0.771 & 94.0 & 1.2 \\
+\textit{Global} & \textit{3{,}339} & \textit{95.8} & \textit{92.8} & \textit{0.951} & \textit{0.893} & \textit{99.5} & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Objects with well-defined shape and spectral contrast achieve high detection rates. Buildings reach 94--95\% Det@0.5 (mIoU 0.81--0.86), cars 75--93\% (mIoU 0.69--0.82), and agricultural fields 95--100\% (mIoU 0.95--1.00). These classes are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On Plant23, pivot irrigation fields achieve 100\% Det@0.5 with BIoU 0.98 despite the MNF false-color composition.
 
-Detection drops for amorphous and elongated features. Roads reach only 49\% Det@0.5 with BIoU 0.14. On Potsdam-1, low vegetation (37\%), impervious surfaces (42\%), and clutter (56\%) fall below the dataset average. Tree detection varies by resolution: 97\% on BSB-1 (24~cm, distinct canopies) vs.\ 73\% on Potsdam-1 (5~cm, contiguous canopy).
+Detection drops for amorphous land cover classes. On Potsdam-1, discrete objects (buildings 95\%, cars 93\%) achieve high Det@0.5, while stuff classes (impervious 42\%, low vegetation 37\%) score lower. However, per-class ASA reveals that pixel-level classification remains accurate for stuff: impervious surfaces achieve 75\% ASA despite 42\% Det@0.5, indicating that the segments are spectrally pure but do not match the GT instance boundaries. Roads on BSB-1 reach only 49\% Det@0.5 but 95\% ASA---the road pixels are correctly classified, but the elongated GT polygons spanning multiple tiles are not reconstructed as single objects.
 
 % ----------------------------------------------------------------------------
 \subsection{Baseline Comparison}
