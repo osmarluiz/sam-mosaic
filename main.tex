@@ -12,6 +12,7 @@
 \usepackage{subcaption}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+\usepackage{placeins}
 
 \modulolinenumbers[1]
 
@@ -217,7 +218,7 @@ After merging, two operations clean the output. First, small connected component
 
 The evaluation uses seven scenes from three datasets spanning different sensors, spatial resolutions, spectral compositions, and land cover types (Table~\ref{tab:datasets}).
 
-\begin{table}[h!]
+\begin{table}[htbp]
 \centering
 \caption{Overview of datasets used in the experiments. Tile counts refer to the default tile size of $1000 \times 1000$~pixels.}
 \label{tab:datasets}
@@ -238,19 +239,13 @@ Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
 
 \textbf{Plant23.} A single crop of $10{,}000 \times 10{,}000$ pixels from a Planet satellite image \citep{frazier2021planet} over an agricultural region in central Brazil. The image uses a false-color composition derived from Minimum Noise Fraction (MNF) transformation \citep{green1988mnf} of the original multispectral bands, with the three highest signal-to-noise components mapped to RGB. At approximately 4.78~m ground sampling distance, the dominant features are large, spectrally homogeneous agricultural fields (soybean, corn, cotton) interspersed with natural vegetation corridors. This dataset evaluates performance on non-natural RGB compositions that SAM2 was never trained on, as well as on scenes dominated by large objects rather than the small, dense features of urban imagery.
 
-% \begin{figure}[h!]
-%     \centering
-%     \includegraphics[width=\textwidth]{figures/study_areas.pdf}
-%     \caption{Study areas and example imagery. (a)~ISPRS Potsdam: dense European urban, true-color RGB at 5~cm. (b)~Bras\'{i}lia: Brazilian urban, true-color RGB at 24~cm. (c)~Plant23: agricultural, MNF false-color at 4.78~m. Note the different object scales: individual cars are visible in Potsdam and Bras\'{i}lia, while Plant23 features span hundreds of pixels.}
-%     \label{fig:study_areas}
-% \end{figure}
 
 \subsection{Implementation Details}
 \label{sec:exp_impl}
 
 All experiments use the SAM2.1 model with the Hiera Large backbone, the largest available checkpoint. The pipeline is implemented in Python~3.12 using PyTorch~2.9 with CUDA~12.8 for GPU inference. All experiments were run on a workstation equipped with an Intel Core i9-14900K CPU, 64~GB of RAM, and an NVIDIA RTX~4090 GPU with 24~GB of VRAM. The default configuration parameters are listed in Table~\ref{tab:default_config}. The source code is publicly available at \url{https://github.com/osmarluiz/sam-mosaic}.
 
-\begin{table}[h!]
+\begin{table}[htbp]
 \centering
 \caption{Default pipeline configuration parameters.}
 \label{tab:default_config}
@@ -315,7 +310,7 @@ Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for a
 \label{sec:res_config}
 \label{sec:res_ablation}
 
-\begin{table}[h!]
+\begin{table}[htbp]
 \centering
 \caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), detection rate at IoU $\geq 0.5$ (Det@0.5, \%), and Boundary IoU (BIoU) across three scenes. All configurations use Dense Grid point sampling.}
 \label{tab:config}
@@ -345,7 +340,7 @@ $T = 250$ & 97.8 & 66{,}253 & 89.8 & .568 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4
 
 Pipeline configuration controls a trade-off between coverage and detection quality (Table~\ref{tab:config}). Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30--68\% of the image with Det@0.5 of 21--76\%. Even at the most permissive threshold ($\tau = 0.70$), coverage reaches only 77--93\%. Fig.~\ref{fig:multipass_progression} illustrates the multi-pass progression on individual tiles: coverage increases from the first pass to 91--98\% at convergence.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/fig3_multipass_progression.png}
     \caption{Multi-pass segmentation progression across three datasets. Each row shows a different scene; each column shows the cumulative result at a different stage. Segments are colored by the stage in which they were added: blue = first pass, orange = intermediate passes, purple = final passes. The bottom panel shows coverage (\%) versus pass number.}
@@ -356,7 +351,7 @@ The full pipeline at $T = 1{,}000$ raises coverage to 91--98\% across all three 
 
 At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but lower Det@0.5 (65\% vs.\ 78\%). Late multi-pass iterations at relaxed thresholds generate large segments that cover residual areas but extend beyond individual object footprints, reducing per-object detection. Reducing tile size resolves this trade-off on scenes with small objects. Fig.~\ref{fig:ablation_visual} illustrates this progression across configurations.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/fig_ablation_visual.png}
     \caption{Visual comparison of pipeline configurations on BSB-1 (24~cm GSD). A: original image. B--D: single-pass SAM2 at three thresholds, showing increasing coverage with decreasing segment quality. E: multi-pass without black mask. F: multi-pass with fixed threshold. G: full pipeline at $T = 1{,}000$, achieving high coverage but with large segments. H: full pipeline at $T = 250$, where each object is individually delineated.}
@@ -365,7 +360,7 @@ At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-m
 
 Reducing tile size functions as an implicit scale parameter. On BSB-1, Det@0.5 increases from 65\% ($T = 1{,}000$) to 90\% ($T = 250$) and BIoU improves from 0.22 to 0.56, as smaller tiles magnify each object in SAM2's fixed $1{,}024 \times 1{,}024$ internal resolution. Fig.~\ref{fig:tilesize_cars} illustrates this on car detection.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig4_tilesize.png}
     \caption{Effect of tile size on small object detection (BSB-1, 24~cm GSD, 259 cars). Top row: original image and RemoteSAMsing segments at three tile sizes. Bottom row: ground truth car polygons and per-car evaluation. Green: correctly delineated (segment-to-car ratio $< 3\times$). Yellow: mild under-segmentation ($3$--$10\times$). Red: severe under-segmentation ($> 10\times$). Gray: missed (no overlapping segment).}
@@ -374,6 +369,7 @@ Reducing tile size functions as an implicit scale parameter. On BSB-1, Det@0.5 i
 
 Smaller tiles do not improve quality on all scenes. On Plant23, BIoU drops from 0.89 ($T = 1{,}000$) to 0.40 ($T = 250$), and on Potsdam-1 Det@0.5 drops from 62\% to 50\%, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. The optimal tile size is therefore scene-dependent: the per-class evaluation in Section~\ref{sec:res_quality} adopts $T = 250$ for BSB-1 (maximizing small-object detection at 24~cm GSD) and $T = 1{,}000$ for Potsdam-1 and Plant23 (avoiding merge chaining).
 
+\FloatBarrier
 % ----------------------------------------------------------------------------
 \subsection{Boundary Merge}
 \label{sec:res_merge}
@@ -381,7 +377,7 @@ Smaller tiles do not improve quality on all scenes. On Plant23, BIoU drops from 
 
 Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The naive baseline merges all segment pairs sharing contact across a tile boundary, propagating merges transitively through Union-Find. On BSB-1, the naive approach fuses multiple buildings and vegetation areas into a single segment spanning the tile corner; on Potsdam-1, 83\% of the crop collapses into a single mega-segment. The best-match strategy requires each segment to commit to exactly one merge partner, the neighbor with the highest contact area, avoiding these spurious fusions.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig5_merge.png}
     \caption{Boundary merge comparison across three datasets. Each row shows a crop centered on a tile boundary (red dashed lines). Before merge: independent per-tile segments with different labels on each side. Naive merge: all touching segments are merged transitively, creating spurious mega-segments. Best-match merge: each segment merges only with its highest-contact neighbor, preserving object identity.}
@@ -390,7 +386,7 @@ Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The nai
 
 Best-match merge produces 10--20\% fewer merges than naive across all seven scenes, preserving 3--7\% more distinct segments (Table~\ref{tab:merge_strategy}). The largest absolute gain occurs on BSB-2, where best-match preserves 401 additional segments.
 
-\begin{table}[h!]
+\begin{table}[htbp]
 \centering
 \caption{Boundary merge comparison (Dense Grid, $T = 1{,}000$). Coverage is identical; segment count and merge count differ.}
 \label{tab:merge_strategy}
@@ -413,13 +409,14 @@ Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 & +150 \\
 
 Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary segmentation. Without padding, segments terminate at tile edges with different labels on each side; the merge algorithm cannot unify them. With padding, objects are segmented continuously across tile edges, enabling correct merges.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig6_padding.png}
     \caption{Effect of contextual padding on boundary segmentation. Colored segments are affected by the tile boundary (red dashed line); gray segments are unaffected. Without padding, segments terminate at the boundary, creating visible discontinuities. With padding, the same objects are segmented continuously across tile edges.}
     \label{fig:padding}
 \end{figure}
 
+\FloatBarrier
 % ----------------------------------------------------------------------------
 \subsection{Segmentation Quality}
 \label{sec:res_quality}
@@ -427,7 +424,7 @@ Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary 
 
 Based on the configuration analysis in Section~\ref{sec:res_config}, this section evaluates Dense Grid $T = 250$ for BSB-1 (27{,}427 segments, 97.8\% pixel coverage), Dense Grid $T = 1{,}000$ for Potsdam-1 (2{,}388 segments, 97.1\%), and Dense Grid $T = 1{,}000$ for Plant23 (4{,}533 segments, 98.1\%). The 2--3\% of uncovered pixels are penalized as background (``Other'' class) in ASA computation and counted as missed objects in per-object evaluation. Per-class evaluation reveals that detection quality varies with object morphology (Table~\ref{tab:perobject}).
 
-\begin{table}[h!]
+\begin{table}[htbp]
 \centering
 \caption{RemoteSAMsing per-class evaluation (greedy oracle protocol). Det@0.5 = detection rate at IoU $\geq 0.5$ (\%) using greedy oracle reconstruction, SS-Det@0.5 = detection rate using best single segment, mIoU = mean greedy oracle IoU, BIoU = Boundary IoU of merged reconstruction, ASA = per-class Achievable Segmentation Accuracy (\%), $\bar{n}$ = mean segments per object.}
 \label{tab:perobject}
@@ -471,6 +468,7 @@ Objects with well-defined shape and spectral contrast achieve high detection rat
 
 Detection drops for amorphous land cover classes. On Potsdam-1, discrete objects (buildings 95\%, cars 93\%) achieve high Det@0.5, while stuff classes (impervious 42\%, low vegetation 37\%) score lower. However, per-class ASA reveals that pixel-level classification remains accurate for stuff: impervious surfaces achieve 75\% ASA despite 42\% Det@0.5, indicating that the segments are spectrally pure but do not match the GT instance boundaries. Roads on BSB-1 reach only 49\% Det@0.5 but 95\% ASA---the road pixels are correctly classified, but the elongated GT polygons spanning multiple tiles are not reconstructed as single objects.
 
+\FloatBarrier
 % ----------------------------------------------------------------------------
 \subsection{Baseline Comparison}
 \label{sec:res_baselines}
@@ -478,14 +476,14 @@ Detection drops for amorphous land cover classes. On Potsdam-1, discrete objects
 
 Table~\ref{tab:baselines} compares RemoteSAMsing against SLIC superpixels \citep{achanta2012slic}, Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}, and SamGeo2 \citep{wu2023samgeo}. SLIC $n_\text{segments}$ is set to approximate RemoteSAMsing's count; Felzenszwalb scale is calibrated similarly (see caption). On BSB-1 (Fig.~\ref{fig:baselines_visual}), RemoteSAMsing produces segments aligned with individual objects, while SLIC and Felzenszwalb cut across or ignore object boundaries.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.97\textwidth]{figures/fig_baselines_visual.png}
     \caption{Visual comparison of segmentation methods on BSB-1 (24~cm GSD). A: original image. B: RemoteSAMsing ($T = 250$) produces segments aligned with individual objects. C: SLIC produces uniform superpixels that cut across object boundaries. D: Felzenszwalb produces irregular segments following spectral gradients rather than object contours.}
     \label{fig:baselines_visual}
 \end{figure}
 
-\begin{table}[h!]
+\begin{table}[htbp]
 \centering
 \caption{Baseline comparison (greedy oracle protocol). Det = Det@0.5 (\%), IoU = mean greedy oracle IoU, BIoU = Boundary IoU. Best per class in bold. SLIC: compactness = 10. Felzenszwalb: $\sigma = 0.5$, min\_size = 50.}
 \label{tab:baselines}
@@ -529,6 +527,7 @@ RemoteSAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated clas
 
 SamGeo2 achieves only 10--29\% global Det@0.5 across datasets, confirming that SAM2 without multi-pass processing is insufficient for RS segmentation. SLIC produces uniform superpixels that cannot resolve small objects (1.8\% Det@0.5 for cars on BSB-1). Felzenszwalb follows spectral gradients but produces low boundary alignment (global BIoU 0.07--0.16).
 
+\FloatBarrier
 % ============================================================================
 \section{Discussion}
 \label{sec:discussion}
