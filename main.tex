@@ -280,7 +280,7 @@ Multiple configurations isolate the role of each component. Three single-pass SA
 
 Component ablation is performed at the default tile size ($T = 1{,}000$) to isolate the effect of each component. Tile size variation uses the full pipeline to isolate the effect of spatial scale. Tile size is varied at $T \in \{1{,}000, 500, 250\}$ on the same three scenes. $T = 1{,}000$ is a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively.
 
-On BSB-1, Potsdam-1, and Plant23, segmentation quality is assessed using Achievable Segmentation Accuracy (ASA) for global superpixel quality and a greedy oracle protocol for per-object reconstruction quality. Section~\ref{sec:exp_metrics} defines both protocols and the resulting metrics.
+Ablation and quality evaluation use three representative scenes with annotated ground truth (BSB-1, Potsdam-1, Plant23), selected to span the full range of spatial resolutions and landscape types. The remaining four scenes (BSB-2, BSB-3, Potsdam-2, Potsdam-3) validate coverage and merge generalization across different urban morphologies (Table~\ref{tab:merge_strategy}). Segmentation quality is assessed using Achievable Segmentation Accuracy (ASA) for global superpixel quality and a greedy oracle protocol for per-object reconstruction quality. Section~\ref{sec:exp_metrics} defines both protocols and the resulting metrics.
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
