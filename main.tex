@@ -442,18 +442,18 @@ Class & $n$ & Det@0.5 & SS-Det & mIoU & BIoU & ASA & $\bar{n}$ \\
 \multicolumn{8}{c}{\footnotesize\textit{BSB-1 (Dense Grid, $T = 250$, 27{,}427 segments, 97.8\% coverage)}} \\
 \midrule
 \multicolumn{8}{l}{\scriptsize\textit{Things}} \\
-Buildings   & 2{,}055 & 94.0 & 80.1 & 0.807 & 0.329 & 97.3 & 2.6 \\
-Trees       & 5{,}440 & 96.9 & 96.5 & 0.917 & 0.739 & 98.1 & 1.1 \\
-Cars        & 1{,}755 & 75.2 & 75.2 & 0.693 & 0.519 & 83.7 & 1.0 \\
-Pools       & 1{,}157 & 72.8 & 71.5 & 0.673 & 0.304 & 91.1 & 1.1 \\
-Courts      &      53 & 96.2 & 96.2 & 0.760 & 0.218 & 96.7 & 1.2 \\
+Buildings   & 2{,}024 & 95.1 & 81.2 & 0.818 & 0.344 & 96.1 & 2.6 \\
+Trees       & 8{,}767 & 87.0 & 85.8 & 0.824 & 0.618 & 92.6 & 1.1 \\
+Cars        & 1{,}579 & 81.5 & 81.4 & 0.728 & 0.555 & 84.4 & 1.0 \\
+Pools       & 1{,}094 & 76.8 & 75.8 & 0.700 & 0.330 & 91.1 & 1.0 \\
+Courts      &      52 & 96.2 & 96.2 & 0.784 & 0.309 & 93.5 & 1.2 \\
 Decks       &      10 & 80.0 & 80.0 & 0.718 & 0.434 & 88.7 & 1.0 \\
 \cmidrule{1-8}
 \multicolumn{8}{l}{\scriptsize\textit{Stuff}} \\
-Roads       &      68 & 48.5 & 38.2 & 0.446 & 0.162 & 95.2 & 2.6 \\
-Lakes       &       8 & 87.5 & 75.0 & 0.740 & 0.427 & 99.6 & 1.4 \\
-Permeable   &    --- & --- & --- & --- & --- & --- & --- \\
-\textit{Global} & \textit{---} & \textit{---} & \textit{---} & \textit{---} & \textit{---} & \textit{---} & --- \\
+Roads       &      43 & 79.1 & 60.5 & 0.651 & 0.241 & 87.9 & 3.5 \\
+Lakes       &       8 & 87.5 & 87.5 & 0.774 & 0.449 & 99.6 & 1.2 \\
+Permeable   & 3{,}671 & 79.2 & 76.7 & 0.748 & 0.538 & 81.7 & 1.2 \\
+\textit{Global} & \textit{17{,}248} & \textit{85.1} & \textit{82.2} & \textit{0.790} & \textit{0.543} & \textit{90.0} & --- \\
 \midrule
 \multicolumn{8}{c}{\footnotesize\textit{Potsdam-1 (Dense Grid, $T = 1{,}000$, 2{,}388 segments, 97.1\% coverage)}} \\
 \midrule
@@ -478,9 +478,9 @@ Lakes       &      73 & 89.0 & 89.0 & 0.888 & 0.773 & 94.0 & 1.2 \\
 \end{tabular}
 \end{table}
 
-Objects with well-defined shape and spectral contrast achieve high detection rates. Buildings reach 94--95\% Det@0.5 (mIoU 0.81--0.86), cars 75--93\% (mIoU 0.69--0.82), and agricultural fields 95--100\% (mIoU 0.95--1.00). These classes are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On Plant23, pivot irrigation fields achieve 100\% Det@0.5 with BIoU 0.98 despite the MNF false-color composition.
+Objects with well-defined shape and spectral contrast achieve high detection rates. Buildings reach 95\% Det@0.5 on both BSB-1 and Potsdam-1, cars 82--93\%, and agricultural fields 95--100\% (mIoU 0.95--1.00). These classes are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On Plant23, pivot irrigation fields achieve 100\% Det@0.5 with BIoU 0.98 despite the MNF false-color composition.
 
-Detection varies with object morphology, following the distinction between ``things'' (countable objects with clear boundaries) and ``stuff'' (amorphous regions) from panoptic segmentation \citep{kirillov2019panoptic}. On Potsdam-1, things (buildings 95\%, cars 93\%) achieve high Det@0.5, while stuff classes (impervious 42\%, low vegetation 37\%) score lower. However, per-class ASA reveals that pixel-level classification remains accurate for stuff: impervious surfaces achieve 75\% ASA despite 42\% Det@0.5, indicating that the segments are spectrally pure but do not match the GT instance boundaries. Roads on BSB-1 reach only 49\% Det@0.5 but 95\% ASA---the road pixels are correctly classified, but the elongated GT polygons spanning multiple tiles are not reconstructed as single objects.
+Detection varies with object morphology, following the distinction between ``things'' (countable objects with clear boundaries) and ``stuff'' (amorphous regions) from panoptic segmentation \citep{kirillov2019panoptic}. On Potsdam-1, things (buildings 95\%, cars 93\%) achieve high Det@0.5, while stuff classes (impervious 42\%, low vegetation 37\%) score lower. However, per-class ASA reveals that pixel-level classification remains accurate for stuff: impervious surfaces achieve 75\% ASA despite 42\% Det@0.5, indicating that the segments are spectrally pure but do not match the GT instance boundaries. Roads on BSB-1 reach 79\% Det@0.5 but 88\% ASA---the road pixels are correctly classified, but the elongated GT polygons spanning multiple tiles are not reconstructed as single objects.
 
 \FloatBarrier
 % ----------------------------------------------------------------------------
@@ -578,14 +578,14 @@ Remote SAMsing achieves higher Det@0.5, mIoU, and BIoU than SLIC, Felzenszwalb, 
 
 Remote SAMsing produces over-segmentation by design: a single building may be split into roof, shadow, and facade segments. This is consistent with the superpixel paradigm in OBIA, where over-segmentation is preferred over under-segmentation because segments can be merged in downstream classification but cannot be split \citep{blaschke2010obia, benz2004ecognition, baatz2000multiresolution}. The high BIoU values indicate that over-segmentation occurs \textit{within} objects rather than \textit{across} object boundaries, meaning segments do not leak into adjacent classes. The gap between Det@0.5 and SS-Det@0.5 (Table~\ref{tab:perobject}) quantifies the role of the merge step: on Potsdam-1, buildings reach 94.9\% detection with merge but only 67.9\% from single segments, confirming that the boundary merge is essential for reconstructing objects that span multiple tiles. This is the fundamental requirement for OBIA: a building split into two segments is acceptable provided neither segment extends into the adjacent road.
 
-ASA \citep{stutz2018superpixels} quantifies this directly. Remote SAMsing achieves ASA of 97.6\% on BSB-1, 75.8\% on Potsdam-1, and 99.5\% on Plant23, meaning that a downstream classifier assigning each segment its majority class achieves 76--99\% accuracy without additional refinement. The Plant23 result (99.5\% ASA with MNF false-color input) suggests that SAM2's learned representations respond to spatial gradients and textural boundaries rather than spectral semantics, indicating applicability beyond natural RGB compositions.
+ASA \citep{stutz2018superpixels} quantifies this directly. Remote SAMsing achieves ASA of 90.0\% on BSB-1, 75.8\% on Potsdam-1, and 99.5\% on Plant23, meaning that a downstream classifier assigning each segment its majority class achieves 76--99\% accuracy without additional refinement. The Plant23 result (99.5\% ASA with MNF false-color input) suggests that SAM2's learned representations respond to spatial gradients and textural boundaries rather than spectral semantics, indicating applicability beyond natural RGB compositions.
 
 \subsection{Limitations}
 \label{sec:disc_limitations}
 
 SAM2 was trained on natural images and may produce suboptimal segments for data modalities far from its training distribution (e.g., SAR, thermal, hyperspectral) \citep{zhang2025sam2survey}. While the Plant23 results with MNF false-color suggest tolerance to non-natural compositions, performance on truly exotic data remains untested. Remote SAMsing produces instance-agnostic segments without class labels; downstream classification is required to produce thematic maps, inherent to SAM2's class-agnostic design.
 
-At 24~cm GSD, small objects such as cars (${\sim}12 \times 12$~pixels) and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit, limiting per-object detection. Roads and other elongated structures that span multiple tiles remain challenging for tile-based approaches, as reflected in the low Det@0.5 (49\%) despite high ASA (95\%) for this class.
+At 24~cm GSD, small objects such as cars (${\sim}12 \times 12$~pixels) and rows of parked cars present a visually homogeneous texture that SAM2 segments as a single unit, limiting per-object detection. Roads and other elongated structures that span multiple tiles remain challenging for tile-based approaches, as reflected in the gap between Det@0.5 (79\%) and SS-Det@0.5 (61\%) for roads, where elongated GT polygons require merge across multiple tiles.
 
 As discussed in Section~\ref{sec:disc_config}, tile sizes below $T = 1{,}000$ at 5~cm GSD cause merge chaining, limiting small-object detection improvement at high spatial resolutions. The processing time remains substantial: approximately 18 hours for $T = 250$ on BSB-1 (1{,}024 tiles), dominated by SAM2 inference with limited opportunity for parallelism within the current tile-sequential architecture. The default configuration was empirically tuned and performs well across the tested scenes, but the threshold decay range and step size may benefit from scene-specific tuning.
 
