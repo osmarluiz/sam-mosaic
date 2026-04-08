@@ -368,7 +368,7 @@ At $T = 1{,}000$, the full pipeline achieves higher coverage than the no-black-m
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/fig_ablation_visual.png}
-    \caption{Visual comparison of pipeline configurations on BSB-1 (24~cm GSD). A: original image. B--D: single-pass SAM2 at three thresholds, showing increasing coverage with decreasing segment quality. E: multi-pass without black mask. F: multi-pass with fixed threshold. G: full pipeline at $T = 1{,}000$, achieving high coverage but with large segments. H: full pipeline at $T = 250$, where each object is individually delineated.}
+    \caption{Visual comparison of pipeline configurations on a BSB-1 crop (24~cm GSD). A: original image. B: SamGeo2 with default SAM2 configuration (${\sim}5\%$ coverage). C: single-pass SAM2 at $\tau = 0.88$ (SAM2 default). D: single-pass with SAM2's built-in multi-scale (crop\_n\_layers $= 1$, $\tau = 0.70$). E: multi-pass without black mask. F: multi-pass with fixed threshold (no adaptive decay). G: full pipeline at $T = 1{,}000$, achieving high coverage but with large segments. H: full pipeline at $T = 250$, where each object is individually delineated.}
     \label{fig:ablation_visual}
 \end{figure}
 
