@@ -322,12 +322,9 @@ Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for t
 \cmidrule(lr){2-5} \cmidrule(lr){6-9} \cmidrule(lr){10-13}
 Configuration & Cov. & Time & Det & BIoU & Cov. & Time & Det & BIoU & Cov. & Time & Det & BIoU \\
 \midrule
-\multicolumn{13}{c}{\footnotesize\textit{Baseline (no pipeline)}} \\
-\midrule
-SamGeo2 & 5.8 & --- & 6.7 & .048 & 9.7 & --- & 20.1 & .083 & 26.5 & --- & 29.2 & .206 \\
-\midrule
 \multicolumn{13}{c}{\footnotesize\textit{Single pass}} \\
 \midrule
+SamGeo2 (default config) & 5.8 & --- & 6.7 & .048 & 9.7 & --- & 20.1 & .083 & 26.5 & --- & 29.2 & .206 \\
 $\tau = 0.93$ & 30.1 & 416 & 15.3 & .065 & 36.5 & 190 & 35.9 & .125 & 68.5 & 671 & 76.3 & .757 \\
 $\tau = 0.88$ (SAM2 default) & 53.1 & 526 & 38.8 & .159 & 60.8 & 228 & 53.9 & .168 & 81.0 & 619 & 86.7 & .788 \\
 $\tau = 0.70$ & 77.0 & 945 & 61.8 & .244 & 86.1 & 454 & 65.2 & .184 & 93.4 & 1{,}162 & 90.1 & .776 \\
