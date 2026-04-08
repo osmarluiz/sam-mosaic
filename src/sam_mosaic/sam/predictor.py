@@ -132,7 +132,8 @@ class SAMPredictor:
         iou_threshold: float = 0.88,
         stability_threshold: float = 0.92,
         min_mask_area: int = 100,
-        box_nms_thresh: float = 0.7
+        box_nms_thresh: float = 0.7,
+        crop_n_layers: int = 0
     ) -> List[Mask]:
         """Predict masks using batched AutomaticMaskGenerator.
 
@@ -162,16 +163,35 @@ class SAMPredictor:
         points_norm[:, 0] /= w  # x
         points_norm[:, 1] /= h  # y
 
+        # When crop_n_layers > 0, SAM2 needs one point grid per layer index.
+        # Layer indices are 0 (original) and 1..n (sub-crop layers).
+        if crop_n_layers > 0:
+            point_grids = [points_norm] * (crop_n_layers + 1)
+        else:
+            point_grids = [points_norm]
+
         # Create generator with custom point grid
         generator = SAM2AutomaticMaskGenerator(
             model=self._model,
             points_per_side=None,  # Disable automatic grid
-            point_grids=[points_norm],  # Use custom points
+            point_grids=point_grids,  # Use custom points
             pred_iou_thresh=iou_threshold,
             stability_score_thresh=stability_threshold,
             min_mask_region_area=min_mask_area,
             box_nms_thresh=box_nms_thresh,
+            crop_n_layers=crop_n_layers,
         )
+
+        # Patch SAM2 bug: when a crop produces no masks, crop_boxes becomes
+        # a 1D empty tensor, causing box_area to fail with IndexError.
+        _orig_process_crop = generator._process_crop
+        def _safe_process_crop(image, crop_box, crop_layer_idx, orig_size):
+            crop_data = _orig_process_crop(image, crop_box, crop_layer_idx, orig_size)
+            if len(crop_data["rles"]) == 0:
+                import torch as _torch
+                crop_data["crop_boxes"] = _torch.zeros((0, 4), dtype=_torch.int32)
+            return crop_data
+        generator._process_crop = _safe_process_crop
 
         # Generate masks in one batched call
         mask_outputs = generator.generate(image)

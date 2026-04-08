@@ -184,6 +184,13 @@ class Pipeline:
         tile_stats = []
         tile_start_time = time.time()
 
+        # Tile cache for resume capability: if a previous run crashed,
+        # re-running the same command will load cached tiles instead of
+        # reprocessing them. Cache is cleaned up after successful completion.
+        tile_cache_dir = output_dir / "_tile_cache"
+        tile_cache_dir.mkdir(exist_ok=True)
+        cached_count = 0
+
         if debug_mode:
             print(f"[DEBUG] Starting tile loop...", flush=True)
 
@@ -194,6 +201,30 @@ class Pipeline:
                     print(f"[DEBUG] VRAM before first tile: {_get_vram()} MB", flush=True)
                 tile_idx = row * n_cols + col + 1
 
+                # Check tile cache for resume
+                cache_file = tile_cache_dir / f"{row}_{col}.npz"
+                if cache_file.exists():
+                    cached = np.load(str(cache_file))
+                    tile_labels = cached["labels"]
+                    mosaic_writer.write_tile(tile_labels, row, col)
+                    tile_max = int(tile_labels.max()) if tile_labels.max() > 0 else 0
+                    if tile_max > label_offset:
+                        label_offset = tile_max
+                    cached_count += 1
+                    if verbose and cached_count == 1:
+                        print(f"  Resuming from cache ({tile_cache_dir})...")
+                    if verbose and (cached_count <= 3 or tile_idx == total_tiles):
+                        print(f"  Tile {tile_idx:3d}/{total_tiles} [{row},{col}] | CACHED")
+                    elif verbose and cached_count == 4:
+                        print(f"  ... (loading cached tiles)")
+                    continue
+
+                # Print summary when transitioning from cached to processing
+                if cached_count > 0 and verbose:
+                    print(f"  Loaded {cached_count} cached tiles. Resuming processing...")
+                    tile_start_time = time.time()  # Reset ETA timer
+                    cached_count = -1  # Prevent re-printing
+
                 # Load tile
                 tile_info = load_tile(
                     input_path,
@@ -203,13 +234,38 @@ class Pipeline:
                     padding=self.config.tile.padding
                 )
 
-                # Process tile
-                result = process_tile(
-                    self._predictor,
-                    tile_info,
-                    self.config,
-                    start_label=label_offset + 1
-                )
+                # Skip empty tiles (all-black, e.g. mosaic gaps)
+                if tile_info.data.sum() == 0:
+                    if verbose:
+                        print(f"  Tile {tile_idx:3d}/{total_tiles} [{row},{col}] | SKIP (empty)")
+                    continue
+
+                # Process tile (with retry on SAM2 internal errors)
+                try:
+                    result = process_tile(
+                        self._predictor,
+                        tile_info,
+                        self.config,
+                        start_label=label_offset + 1
+                    )
+                except (TypeError, RuntimeError) as e:
+                    # SAM2 can corrupt internal state after many iterations.
+                    # Full GPU reset and retry usually fixes it.
+                    if verbose:
+                        print(f"  [Error at tile {tile_idx}: {e}. Resetting GPU and retrying...]")
+                    self._predictor.unload_model()
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    self._predictor.load_model()
+                    result = process_tile(
+                        self._predictor,
+                        tile_info,
+                        self.config,
+                        start_label=label_offset + 1
+                    )
+
+                # Save tile to cache for resume
+                np.savez_compressed(str(cache_file), labels=result.labels)
 
                 # Write tile to mosaic
                 mosaic_writer.write_tile(result.labels, row, col)
@@ -232,8 +288,10 @@ class Pipeline:
 
                 if verbose:
                     elapsed = time.time() - tile_start_time
-                    avg_time = elapsed / tile_idx
-                    eta = avg_time * (total_tiles - tile_idx)
+                    tiles_processed = tile_idx - max(0, cached_count)
+                    avg_time = elapsed / max(tiles_processed, 1)
+                    remaining = total_tiles - tile_idx
+                    eta = avg_time * remaining
                     eta_str = f"{eta/60:.1f}min" if eta >= 60 else f"{eta:.0f}s"
 
                     print(f"  Tile {tile_idx:3d}/{total_tiles} [{row},{col}] | "
@@ -243,14 +301,35 @@ class Pipeline:
                 # Cleanup: reset predictor state for next tile
                 self._predictor.reset_image()
 
-                # Batch GPU memory cleanup (every 10 tiles) to reduce sync overhead
-                if tile_idx % 10 == 0:
+                # Periodic full model reset to prevent CUDA memory fragmentation
+                # on large jobs (e.g. 1600 tiles). Adds ~5-10s per reset but
+                # prevents silent OOM crashes from accumulated GPU memory.
+                # Scale reset frequency with tile count: every 50 for 500+ tiles,
+                # every 100 otherwise. Small tile_size jobs generate more passes
+                # per tile, accumulating more GPU memory fragmentation.
+                reset_interval = 25 if total_tiles >= 1000 else (50 if total_tiles >= 500 else 100)
+                if tile_idx % reset_interval == 0:
+                    self._predictor.unload_model()
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    self._predictor.load_model()
+                    if verbose:
+                        print(f"  [GPU memory reset at tile {tile_idx}]")
+                elif tile_idx % 10 == 0:
+                    # Lighter cleanup every 10 tiles
                     gc.collect()
                     torch.cuda.empty_cache()
 
         # Final GPU cleanup after all tiles
         gc.collect()
         torch.cuda.empty_cache()
+
+        # Clean up tile cache after successful completion
+        import shutil
+        if tile_cache_dir.exists():
+            shutil.rmtree(tile_cache_dir)
+            if verbose:
+                print(f"  Tile cache cleaned up.")
 
         # Post-processing
         if verbose:
@@ -282,7 +361,8 @@ class Pipeline:
         mosaic, merge_stats = merge_at_discontinuities(
             mosaic,
             tile_size,
-            self.config.merge.min_contact_pixels,
+            min_contact=self.config.merge.min_contact_pixels,
+            merge_strategy=self.config.merge.merge_strategy,
             return_stats=True
         )
         if verbose:
@@ -418,6 +498,7 @@ class Pipeline:
                         "erosion_iterations": self.config.segmentation.erosion_iterations,
                     },
                     "merge": {
+                        "merge_strategy": self.config.merge.merge_strategy,
                         "min_contact_pixels": self.config.merge.min_contact_pixels,
                         "min_mask_area": self.config.merge.min_mask_area,
                         "merge_enclosed_max_area": self.config.merge.merge_enclosed_max_area,

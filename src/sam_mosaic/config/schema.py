@@ -72,8 +72,16 @@ class SegmentationConfig:
             - "dense_grid": Fixed uniform grid, filtered by mask.
               Good for urban/small objects (cars, buildings).
         erosion_iterations: Iterations to erode valid area before placing points.
-            Larger values keep points away from edges.
-            Default: 10 for kmeans, 5 recommended for dense_grid.
+            Larger values keep points away from edges. Default: 0 (no erosion).
+        crop_n_layers: Number of SAM2 crop layers for multi-scale detection.
+            0 = single scale (default). 1 = original + 4 sub-crops at 2x zoom.
+            Higher values help detect small objects (e.g., cars in urban scenes).
+        box_nms_thresh: NMS threshold for overlapping mask bounding boxes.
+            0.7 = default (aggressive, removes small masks overlapping large ones).
+            1.0 = disabled (keeps all masks, relies on black mask for dedup).
+        sort_by_area: Sort masks by area ascending before applying.
+            When True, small objects (cars) get priority over large ones (roofs).
+            Works best with use_black_mask=True.
     """
     points_per_side: int = 64
     target_coverage: float = 99.0
@@ -81,7 +89,10 @@ class SegmentationConfig:
     use_black_mask: bool = True
     use_adaptive_threshold: bool = True
     point_strategy: str = "kmeans"
-    erosion_iterations: int = 10
+    erosion_iterations: int = 0
+    crop_n_layers: int = 0
+    box_nms_thresh: float = 0.7
+    sort_by_area: bool = False
 
 
 @dataclass
@@ -89,11 +100,17 @@ class MergeConfig:
     """Post-processing merge configuration.
 
     Attributes:
+        merge_strategy: Strategy for merging at tile discontinuities.
+            - "mutual_best": Parameter-free. Merge (A, B) only when A is
+              B's best match and B is A's best match (by contact area).
+            - "min_contact": Merge any pair with >= min_contact_pixels.
         min_contact_pixels: Minimum pixels of contact to merge at discontinuities.
+            Only used when merge_strategy="min_contact".
         min_mask_area: Remove masks smaller than this area.
         merge_enclosed_max_area: Merge enclosed masks up to this size.
     """
-    min_contact_pixels: int = 5
+    merge_strategy: str = "best_match"
+    min_contact_pixels: int = 20
     min_mask_area: int = 100
     merge_enclosed_max_area: int = 500
 
@@ -164,6 +181,8 @@ class Config:
             raise ValueError(f"segmentation.point_strategy must be 'kmeans' or 'dense_grid', got {self.segmentation.point_strategy}")
         if self.segmentation.erosion_iterations < 0:
             raise ValueError(f"segmentation.erosion_iterations must be non-negative, got {self.segmentation.erosion_iterations}")
+        if self.merge.merge_strategy not in ("best_match", "mutual_best", "min_contact"):
+            raise ValueError(f"merge.merge_strategy must be 'mutual_best' or 'min_contact', got {self.merge.merge_strategy}")
         if self.output.streaming_mode not in ("auto", "ram", "disk"):
             raise ValueError(f"output.streaming_mode must be 'auto', 'ram', or 'disk', got {self.output.streaming_mode}")
 
@@ -197,6 +216,10 @@ class Config:
             "use_adaptive_threshold": ("segmentation", "use_adaptive_threshold"),
             "point_strategy": ("segmentation", "point_strategy"),
             "erosion_iterations": ("segmentation", "erosion_iterations"),
+            "crop_n_layers": ("segmentation", "crop_n_layers"),
+            "box_nms_thresh": ("segmentation", "box_nms_thresh"),
+            "sort_by_area": ("segmentation", "sort_by_area"),
+            "merge_strategy": ("merge", "merge_strategy"),
             "min_contact_pixels": ("merge", "min_contact_pixels"),
             "min_mask_area": ("merge", "min_mask_area"),
             "merge_enclosed_max_area": ("merge", "merge_enclosed_max_area"),

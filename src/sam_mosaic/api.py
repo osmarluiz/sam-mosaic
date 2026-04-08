@@ -80,9 +80,13 @@ def segment_with_params(
     use_black_mask: bool = True,
     use_adaptive_threshold: bool = True,
     point_strategy: str = "kmeans",
-    erosion_iterations: int = 10,
+    erosion_iterations: int = 0,
+    crop_n_layers: int = 0,
+    box_nms_thresh: float = 0.7,
+    sort_by_area: bool = False,
     # Merge parameters
-    min_contact_pixels: int = 5,
+    merge_strategy: str = "best_match",
+    min_contact_pixels: int = 20,
     min_mask_area: int = 100,
     merge_enclosed_max_area: int = 500,
     # Output parameters
@@ -176,8 +180,12 @@ def segment_with_params(
             use_adaptive_threshold=use_adaptive_threshold,
             point_strategy=point_strategy,
             erosion_iterations=erosion_iterations,
+            crop_n_layers=crop_n_layers,
+            box_nms_thresh=box_nms_thresh,
+            sort_by_area=sort_by_area,
         ),
         merge=MergeConfig(
+            merge_strategy=merge_strategy,
             min_contact_pixels=min_contact_pixels,
             min_mask_area=min_mask_area,
             merge_enclosed_max_area=merge_enclosed_max_area,

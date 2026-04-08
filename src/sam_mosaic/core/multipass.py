@@ -123,8 +123,14 @@ def run_multipass_segmentation(
             current_image,
             np.array(points),
             iou_threshold=current_iou,
-            stability_threshold=current_stab
+            stability_threshold=current_stab,
+            crop_n_layers=seg_config.crop_n_layers,
+            box_nms_thresh=seg_config.box_nms_thresh
         )
+
+        # Sort masks by area ascending (small objects first)
+        if seg_config.sort_by_area and len(masks) > 1:
+            masks.sort(key=lambda m: (m.data if hasattr(m, 'data') else m.mask).sum())
 
         # Add masks that don't overlap too much with existing coverage
         # Split each mask into connected components and filter small ones
