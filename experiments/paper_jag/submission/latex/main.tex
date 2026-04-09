@@ -561,7 +561,14 @@ SamGeo2 achieves only 7--29\% global Det@0.5 across datasets, confirming that SA
 \label{sec:res_scalability}
 % ----------------------------------------------------------------------------
 
-To validate scalability beyond individual image patches, Remote SAMsing processed a full Potsdam mosaic of $36{,}000 \times 54{,}000$ pixels (1.94 billion pixels, 38 patches stitched at 5~cm GSD) using the default configuration ($T = 1{,}000$, Dense Grid). The pipeline produced 124{,}180 segments with a mean per-patch coverage of 97.0\% (range 92.9--98.5\%) and global ASA of 81.8\% across 37 evaluated patches with ground truth. Per-class ASA follows the same pattern observed on individual patches: buildings (95.2\%) and cars (89.6\%) achieve high accuracy, while trees (50.4\%) remain the most challenging class due to canopy fragmentation. The boundary merge operated seamlessly across all 1{,}944 tiles, including boundaries between adjacent Potsdam patches that were not present in the original dataset. Processing required approximately 20 hours on a single GPU, with tiles processed independently and merged in a single post-processing pass of under 5 minutes.
+To validate scalability beyond individual image patches, Remote SAMsing processed a full Potsdam mosaic of $36{,}000 \times 54{,}000$ pixels (1.94 billion pixels, 38 patches stitched at 5~cm GSD) using the default configuration ($T = 1{,}000$, Dense Grid). Fig.~\ref{fig:potsdam_full} shows the complete segmentation result with four zoom details. The pipeline produced 124{,}180 segments with a mean per-patch coverage of 97.0\% (range 92.9--98.5\%) and global ASA of 81.8\% across 37 evaluated patches with ground truth. Per-class ASA follows the same pattern observed on individual patches: buildings (95.2\%) and cars (89.6\%) achieve high accuracy, while trees (50.4\%) remain the most challenging class due to canopy fragmentation. The boundary merge operated seamlessly across all 1{,}944 tiles, including boundaries between adjacent Potsdam patches that were not present in the original dataset. Processing required approximately 20 hours on a single GPU, with tiles processed independently and merged in a single post-processing pass of under 5 minutes.
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_potsdam_full.png}
+    \caption{Full Potsdam mosaic segmentation ($36{,}000 \times 54{,}000$ pixels, 5~cm GSD, 38 stitched patches). The pipeline produced 124{,}180 segments at 97\% mean coverage with 81.8\% ASA. Zoom panels A--D show segment detail in four regions of the mosaic, with matching colored rectangles indicating the source locations. Coordinates are in UTM zone 33N (EPSG:32633). Segment colors are assigned randomly for visualization.}
+    \label{fig:potsdam_full}
+\end{figure}
 
 \FloatBarrier
 % ============================================================================
