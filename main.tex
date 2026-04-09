@@ -556,6 +556,14 @@ Remote SAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated cla
 SamGeo2 achieves only 7--29\% global Det@0.5 across datasets, confirming that SAM2 without multi-pass processing is insufficient for RS segmentation. SLIC produces uniform superpixels that cannot resolve small objects (2.0\% Det@0.5 for cars on BSB-1). Felzenszwalb follows spectral gradients but produces low boundary alignment (global BIoU 0.07--0.14).
 
 \FloatBarrier
+% ----------------------------------------------------------------------------
+\subsection{Scalability}
+\label{sec:res_scalability}
+% ----------------------------------------------------------------------------
+
+To validate scalability beyond individual image patches, Remote SAMsing processed a full Potsdam mosaic of $36{,}000 \times 54{,}000$ pixels (1.94 billion pixels, 38 patches stitched at 5~cm GSD) using the default configuration ($T = 1{,}000$, Dense Grid). The pipeline produced 124{,}180 segments with a mean per-patch coverage of 97.0\% (range 92.9--98.5\%) and global ASA of 81.8\% across 37 evaluated patches with ground truth. Per-class ASA follows the same pattern observed on individual patches: buildings (95.2\%) and cars (89.6\%) achieve high accuracy, while trees (50.4\%) remain the most challenging class due to canopy fragmentation. The boundary merge operated seamlessly across all 1{,}944 tiles, including boundaries between adjacent Potsdam patches that were not present in the original dataset. Processing required approximately 20 hours on a single GPU, with tiles processed independently and merged in a single post-processing pass of under 5 minutes.
+
+\FloatBarrier
 % ============================================================================
 \section{Discussion}
 \label{sec:discussion}
@@ -611,7 +619,7 @@ As discussed in Section~\ref{sec:disc_config}, tile sizes below $T = 1{,}000$ at
 
 This paper presented Remote SAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images. A multi-pass algorithm with black mask focusing and adaptive threshold decay raises coverage from 30--68\% (single-pass SAM2) to 91--98\%, and a parameter-free boundary merge produces spatially consistent mosaics across tile boundaries. Without this pipeline, SAM2 with default tiling (SamGeo2) achieves only 6--27\% coverage.
 
-Across seven scenes spanning 5~cm to 4.78~m GSD, Remote SAMsing achieves Det@0.5 of 62--96\%, ASA of 76--99\%, and Boundary IoU 3--8$\times$ higher than SLIC and Felzenszwalb baselines. SAM2's learned representations transfer particularly well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but show lower performance on amorphous land cover classes, mirroring the things-stuff distinction in panoptic segmentation. Tile size functions as an implicit scale parameter: reducing $T$ from 1{,}000 to 250 increases Det@0.5 from 56\% to 85\% on BSB-1, but causes merge chaining at high spatial resolutions, establishing a practical minimum ground coverage of approximately 50~m per tile side. The pipeline operates on MNF false-color imagery without retraining, indicating that SAM2 responds to spatial gradients rather than spectral semantics.
+Across seven scenes spanning 5~cm to 4.78~m GSD, Remote SAMsing achieves Det@0.5 of 62--96\%, ASA of 76--99\%, and Boundary IoU 3--8$\times$ higher than SLIC and Felzenszwalb baselines. SAM2's learned representations transfer particularly well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but show lower performance on amorphous land cover classes, mirroring the things-stuff distinction in panoptic segmentation. Tile size functions as an implicit scale parameter: reducing $T$ from 1{,}000 to 250 increases Det@0.5 from 56\% to 85\% on BSB-1, but causes merge chaining at high spatial resolutions, establishing a practical minimum ground coverage of approximately 50~m per tile side. A scalability test on a full Potsdam mosaic ($36{,}000 \times 54{,}000$ pixels) produced 124{,}180 segments at 97\% coverage with 81.8\% ASA, confirming that the pipeline operates at production scale. The pipeline also operates on MNF false-color imagery without retraining, indicating that SAM2 responds to spatial gradients rather than spectral semantics.
 
 Future work includes fine-tuning SAM2 on RS data to improve performance on stuff classes with diffuse boundaries, integrating Remote SAMsing segments as input to supervised classifiers for thematic mapping, and developing a hierarchical multi-scale approach that applies fine-resolution processing only to residual unsegmented areas. An improved merge algorithm incorporating spectral similarity could mitigate merge chaining at high spatial resolutions.
 
