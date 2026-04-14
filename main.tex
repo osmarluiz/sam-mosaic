@@ -99,7 +99,7 @@ Recent reviews \citep{osco2023sam_rs_review, wan2025samrs_survey} cover SAM adop
 
 Zero-shot evaluations have identified failure modes specific to RS. \citet{ren2024segment_anything_everywhere} reported degraded performance on spectrally homogeneous objects, small objects below the model's effective resolution, and adjacent features with ambiguous boundaries. \citet{osco2023sam_rs_review} confirmed these limitations across UAV, airborne, and satellite scales, with performance degradation above 1--2~m ground sampling distance.
 
-Practical tools include Geo-SAM \citep{zhao2023geosam}, a QGIS plugin for interactive segmentation via user-placed prompts, and the segment-geospatial library \citep{wu2023samgeo}, which supports tiled processing of large images. However, segment-geospatial processes each tile independently with SAM's default settings, without a merge algorithm or coverage optimization.
+Practical tools include Geo-SAM \citep{zhao2023geosam}, a QGIS plugin that requires the user to place prompts manually for each object, and the segment-geospatial library \citep{wu2023samgeo}, which supports automatic tiled processing of large images. Neither addresses the two problems targeted here: Geo-SAM does not automate segmentation, and segment-geospatial processes each tile independently with SAM's default settings, without a merge algorithm or coverage optimization.
 
 % ----------------------------------------------------------------------------
 \subsection{Coverage and Segment Quality}
@@ -154,7 +154,7 @@ The first pass runs SAM2's standard AMG on the unmodified tile image with a unif
 \STATE $\tau \leftarrow \tau_{\text{start}}$
 \STATE Run SAM2 on $I$ with uniform $k \times k$ grid at $\tau$; assign labels; compute coverage
 \REPEAT
-    \STATE Mask segmented pixels to $(0, 0, 0)$ in $I$
+    \STATE Mask segmented pixels to black in $I$
     \STATE Generate points on residual area (Dense Grid)
     \STATE Run SAM2 at $\tau$; accept qualifying masks; update coverage
     \IF{coverage gain $< 0.1$ pp}
@@ -201,12 +201,12 @@ The input image of size $W \times H$ is divided into a regular grid of non-overl
 
 Even with padding, tiles are segmented independently, so the same object may receive different labels in adjacent tiles. A merge step produces a spatially consistent label mosaic. For each tile boundary (horizontal and vertical), the algorithm compares labels on adjacent pixels across the boundary and records the contact count for each pair. Merging all touching pairs would propagate spurious merges: two unrelated segments (e.g., a building and an adjacent road) that share a few pixels of contact at the boundary would be fused. Remote SAMsing instead employs a parameter-free \textit{best-match} strategy: each segment selects the neighbor with the highest contact count, and only these best-match pairs are retained. A stricter mutual-best criterion (merge only when both segments select each other) would fail on asymmetric splits where one side is fragmented; a contact-threshold criterion would require a tunable parameter. Best-match avoids both issues, handling 1:1 merges (an object split across two tiles) and $N$:1 merges (an object fragmented on one side but whole on the other), while each segment commits to exactly one merge partner.
 
-The merge pairs are processed by a Union-Find structure \citep{tarjan1975union} with path compression, which handles transitive merges implicitly. A lookup table maps each original label to its root, and the entire mosaic is relabeled in a single pass. The total complexity is $O(n \cdot \alpha(n))$, effectively linear in the number of pixels.
+The merge pairs are processed by a Union-Find structure \citep{tarjan1975union} with path compression, which handles transitive merges implicitly. A lookup table maps each original label to its root, and the entire mosaic is relabeled in a single pass. The total complexity is $O(n \cdot \alpha(n))$, where $\alpha$ is the inverse Ackermann function, which grows so slowly that $\alpha(n) \leq 4$ for any practical input size, making the operation effectively linear in the number of pixels.
 
 \subsubsection{Post-processing}
 \label{sec:method_postproc}
 
-After merging, two operations clean the output. First, small connected components that are entirely enclosed by a single neighboring segment are absorbed into that neighbor. These are typically internal fragments (shadow patches within buildings, narrow gaps between adjacent masks) that SAM2 produces as separate segments but that belong to the enclosing object. Second, remaining isolated components below a minimum area threshold are removed as noise. The final output is a georeferenced raster with integer segment identifiers.
+After merging, two operations clean the output. First, small connected components that are entirely enclosed by a single neighboring segment are absorbed into that neighbor. These are typically internal fragments (shadow patches within buildings, narrow gaps between adjacent masks) that SAM2 produces as separate segments but that belong to the enclosing object. Second, remaining isolated components below a minimum area threshold ($a_{\min}$, Table~\ref{tab:default_config}) are removed as noise. Both thresholds were set empirically to balance noise removal against preservation of small but meaningful objects such as cars and narrow walkways. The final output is a georeferenced raster with integer segment identifiers.
 
 
 % ============================================================================
