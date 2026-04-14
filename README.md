@@ -1,15 +1,19 @@
-# SAM-Mosaic
+# Remote SAMsing
 
-Large-scale image segmentation using SAM2 with intelligent tiling and merging.
+**From Segment Anything to Segment Everything**
 
-Segment large remote sensing images (satellite, aerial, drone) that don't fit in GPU memory by processing them in tiles and intelligently merging the results.
+Segment large remote sensing images (satellite, aerial, drone) that exceed GPU memory by processing them in tiles and intelligently merging the results. Built on SAM2, the `sam-mosaic` package achieves 91--98% coverage across diverse scenes without any model fine-tuning or manual annotation.
+
+Tested on 7 scenes spanning 5 cm to 4.78 m GSD, two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural), including a scalability test on a 36,000 x 54,000 pixel mosaic (1.94 billion pixels).
+
+> **Paper:** O. L. F. de Carvalho, O. A. de Carvalho Junior, A. O. de Albuquerque, and D. Guerreiro e Silva, "Remote SAMsing: From Segment Anything to Segment Everything," *Int. J. Applied Earth Observation and Geoinformation*, 2026.
 
 ## Features
 
-- **Multi-pass segmentation** with adaptive thresholds for high coverage (>99%)
-- **Black mask focusing** to help SAM segment residual areas efficiently
-- **Optimized merge** at tile boundaries using LUT + Union-Find (O(n) complexity)
-- **Flexible point strategies**: K-means (default) or dense grid for urban/small objects
+- **Multi-pass segmentation** with adaptive thresholds for high coverage (91--98%)
+- **Black mask focusing** to direct SAM toward residual unsegmented areas
+- **Best-match boundary merge** at tile edges using LUT + Union-Find (parameter-free, O(n) complexity)
+- **Dense Grid point strategy** (default) for robust performance across object scales
 - **Adaptive tile padding** to ensure clean merges at boundaries
 - **GeoTIFF support** with CRS and georeferencing preservation
 - **Multiple output formats**: Raster labels (TIFF) + Vector polygons (Shapefile/GeoPackage)
@@ -46,7 +50,7 @@ pip install -e .
 pip install sam2
 ```
 
-> **Important - SAM2 Version**: We use `sam2` from PyPI ([JinsuaFeito-dev fork](https://github.com/JinsuaFeito-dev/segment-anything-2)), NOT the official Facebook repository. This version (1.1.0+) has been tested for stable GPU memory usage during large-scale processing. Do NOT install from `pip install git+https://github.com/facebookresearch/sam2.git` as it may cause memory leaks.
+> **Important - SAM2 Version**: This project uses `sam2` from PyPI ([JinsuaFeito-dev fork](https://github.com/JinsuaFeito-dev/segment-anything-2)), NOT the official Facebook repository. This version (1.1.0+) has been tested for stable GPU memory usage during large-scale processing. Do NOT install from `pip install git+https://github.com/facebookresearch/sam2.git` as it may cause memory leaks.
 
 ### 2. Download SAM2 Model
 
@@ -145,8 +149,8 @@ After running, the output directory will contain:
 | `--padding` | 50 | Extra context pixels around each tile. Helps with boundary merging. |
 | `--min-area` | 100 | Remove segments smaller than this (in pixels). |
 | `--target-coverage` | 99.0 | Stop segmentation when this coverage % is reached. |
-| `--point-strategy` | kmeans | Point selection: `kmeans` (large regions) or `dense_grid` (urban/small objects). |
-| `--erosion` | 10 | Erosion iterations for point placement. Use 5 for dense_grid. |
+| `--point-strategy` | dense_grid | Point selection: `dense_grid` (default, robust) or `kmeans` (alternative). |
+| `--erosion` | 0 | Erosion iterations for point placement. Increase for denser scenes. |
 | `--iou-start` | 0.93 | Initial IoU threshold (restrictive). |
 | `--iou-end` | 0.60 | Final IoU threshold (permissive). |
 | `--stability-start` | 0.93 | Initial stability score threshold. |
@@ -154,23 +158,23 @@ After running, the output directory will contain:
 
 ### Point Strategies
 
-SAM-Mosaic supports two point selection strategies for multi-pass segmentation:
+Remote SAMsing supports two point selection strategies for multi-pass segmentation:
 
-**K-means (default)**: Clusters points in residual (unsegmented) areas. Best for images with large, homogeneous regions like agricultural fields or forests.
+**Dense Grid (default)**: Uses a uniform grid filtered by already-segmented areas. Robust across scene types, from urban imagery with small objects to agricultural fields with large parcels.
 
-**Dense Grid**: Uses a uniform grid filtered by already-segmented areas. Best for urban imagery with many small, scattered objects like cars, buildings, or infrastructure.
+**K-means**: Clusters points in residual (unsegmented) areas. An alternative when targeting large, homogeneous regions.
 
 ```bash
-# Default: K-means for large regions
+# Default: Dense Grid (works well for most scenes)
 sam-mosaic input.tif output/ --checkpoint sam2.pt
 
-# Dense grid for urban/small objects
+# Dense Grid with higher point density for very small objects
 sam-mosaic input.tif output/ --checkpoint sam2.pt \
-    --point-strategy dense_grid --erosion 5
+    --points-per-side 96
 
-# Dense grid with higher point density for very small objects
+# K-means for large homogeneous regions
 sam-mosaic input.tif output/ --checkpoint sam2.pt \
-    --point-strategy dense_grid --points-per-side 96 --erosion 3
+    --point-strategy kmeans --erosion 5
 ```
 
 ### Threshold Parameters
@@ -180,7 +184,7 @@ SAM2 uses two thresholds to filter predicted masks:
 - **IoU threshold** (`--iou-start`, `--iou-end`): Filters masks by predicted IoU score
 - **Stability threshold** (`--stability-start`, `--stability-end`): Filters masks by stability score
 
-Both thresholds decrease from start to end across passes, allowing more permissive masks as coverage increases.
+Both thresholds decrease from start to end across passes, allowing more permissive masks as coverage increases. Strict thresholds capture salient objects first; relaxation occurs only when progress stagnates.
 
 ```bash
 # More restrictive (fewer but higher quality segments)
@@ -223,13 +227,15 @@ threshold:
   step: 0.01           # Threshold decrease per pass
 
 segmentation:
+  point_strategy: dense_grid
   points_per_side: 64  # Grid density (64x64 = 4096 points)
   target_coverage: 99.0
   use_black_mask: true
   use_adaptive_threshold: true
 
 merge:
-  min_contact_pixels: 5
+  merge_strategy: best_match
+  min_contact_pixels: 20
   min_mask_area: 100
   merge_enclosed_max_area: 500
 
@@ -251,61 +257,31 @@ sam-mosaic input.tif output/ --config config.yaml
 
 ## How It Works
 
-### Multi-Pass Segmentation
+Remote SAMsing processes each tile in multiple passes with decreasing quality thresholds:
 
-The algorithm processes each tile in multiple passes:
+1. **Pass 1**: Uniform grid (64x64 = 4096 points) with strict IoU/stability thresholds (0.93). Captures high-confidence segments first (~60--70% coverage).
 
-1. **Pass 1**: Uniform grid (64x64 = 4096 points) with high IoU threshold (0.93)
-   - Gets high-confidence segments first (~60-70% coverage)
+2. **Pass 2+**: Points placed only in residual (unsegmented) areas via the Dense Grid strategy. A black mask is applied to already-segmented pixels, directing SAM toward remaining gaps. Thresholds decrease gradually (0.93 -> 0.92 -> ... -> 0.60), but only when coverage progress stagnates.
 
-2. **Pass 2+**: K-means points in residual (unsegmented) areas
-   - Black mask applied to already-segmented areas
-   - Threshold decreases gradually: 0.93 → 0.92 → ... → 0.60
-   - Focuses SAM on remaining difficult areas
+3. **Stop condition**: Coverage >= 99% or minimum threshold reached.
 
-3. **Stop condition**: Coverage ≥ 99% or minimum threshold reached
-
-### Tile Processing with Padding
-
-```
-┌────────────────────────────────────┐
-│  Padding (50px)                    │
-│  ┌──────────────────────────────┐  │
-│  │                              │  │
-│  │      Useful Area             │  │
-│  │      (1000x1000)             │  │
-│  │                              │  │
-│  └──────────────────────────────┘  │
-│                                    │
-└────────────────────────────────────┘
-        Total read: 1100x1100
-```
-
-Padding provides context at tile boundaries, ensuring segments extend to edges for proper merging.
-
-### Optimized Boundary Merge
-
-After all tiles are processed, segments touching at tile boundaries are merged:
-
-1. Find all label pairs touching at discontinuity lines
-2. Filter by minimum contact (default: 5 pixels)
-3. Use Union-Find for transitive merges
-4. Apply with single LUT lookup (O(n) complexity)
+After all tiles are processed, segments touching at tile boundaries are reconciled through a **best-match merge**: each label pair at a discontinuity line is scored by contact length, and the best match for each label is accepted. Union-Find resolves transitive chains, and a single LUT lookup relabels the full image in O(n) time. This merge is parameter-free and produces a spatially consistent label map for arbitrarily large images with constant GPU memory.
 
 ---
 
 ## Requirements
 
-- **Python**: 3.10+
+- **Python**: 3.12
 - **GPU**: NVIDIA GPU with CUDA (recommended). Works on CPU but much slower.
 - **RAM**: 16GB+ recommended for large images
-- **VRAM**: 8GB+ recommended (tested with 24GB GPU on 10k×10k images)
+- **VRAM**: 8GB+ recommended (tested with 24GB GPU on images up to 1.94 billion pixels)
 - **Disk**: ~1GB for SAM2 checkpoint + space for outputs
 
 ### Dependencies
 
-- PyTorch 2.0+
+- PyTorch 2.9
 - SAM2 1.1.0+ (from PyPI)
+- CUDA 12.8
 - rasterio
 - numpy, scipy, scikit-learn
 - shapely, fiona
@@ -313,13 +289,15 @@ After all tiles are processed, segments touching at tile boundaries are merged:
 
 ### Tested Configuration
 
-| Component | Version |
-|-----------|---------|
-| Python | 3.10, 3.11 |
+| Component | Specification |
+|-----------|---------------|
+| CPU | Intel Core i9-14900K |
+| RAM | 64 GB |
+| GPU | NVIDIA RTX 4090 (24 GB VRAM) |
+| Python | 3.12 |
+| PyTorch | 2.9 |
 | SAM2 | 1.1.0 |
-| PyTorch | 2.0+ |
-| CUDA | 12.6 |
-| NVIDIA Driver | 560.94 |
+| CUDA | 12.8 |
 
 ---
 
@@ -339,7 +317,7 @@ result = segment_with_params(
     use_adaptive_threshold=False
 )
 
-# Without black mask (5-10x slower)
+# Without black mask
 result = segment_with_params(
     "input.tif", "output/no_blackmask/",
     checkpoint="checkpoints/sam2.1_hiera_large.pt",
@@ -353,11 +331,11 @@ result = segment_with_params(
     padding=0
 )
 
-# Dense grid for urban imagery
+# K-means point strategy (alternative to default Dense Grid)
 result = segment_with_params(
-    "input.tif", "output/urban/",
+    "input.tif", "output/kmeans/",
     checkpoint="checkpoints/sam2.1_hiera_large.pt",
-    point_strategy="dense_grid",
+    point_strategy="kmeans",
     erosion_iterations=5
 )
 
@@ -441,10 +419,11 @@ This will print detailed loading steps. The last `[DEBUG]` message before hangin
 If you use this software in your research, please cite:
 
 ```bibtex
-@software{sam_mosaic,
-  title = {SAM-Mosaic: Large-scale Image Segmentation with SAM2},
-  author = {Carvalho, Osmar Luiz Ferreira de},
-  year = {2025},
+@article{carvalho2026remotesamsing,
+  title = {Remote {SAMsing}: From Segment Anything to Segment Everything},
+  author = {de Carvalho, Osmar Luiz Ferreira and de Carvalho J{\'u}nior, Osmar Ab{\'i}lio and de Albuquerque, Anesmar Olino and Guerreiro e Silva, Daniel},
+  journal = {International Journal of Applied Earth Observation and Geoinformation},
+  year = {2026},
   url = {https://github.com/osmarluiz/sam-mosaic}
 }
 ```
