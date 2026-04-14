@@ -1,0 +1,36 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+
+\begin{document}
+
+\noindent\today
+
+\vspace{1cm}
+\noindent Dear Editor,
+
+\vspace{0.5cm}
+\noindent Please find enclosed the manuscript entitled \textbf{``Remote SAMsing: From Segment Anything to Segment Everything''} for consideration as a research article in the \textit{International Journal of Applied Earth Observation and Geoinformation}.
+
+This manuscript addresses a practical gap in applying the Segment Anything Model 2 (SAM2) to remote sensing: while SAM2 produces high-quality masks on individual image patches, it leaves 30--70\% of a typical remote sensing image unsegmented and provides no mechanism for reconciling masks across tile boundaries. Remote SAMsing solves both problems through a multi-pass algorithm with adaptive threshold decay and a parameter-free boundary merge, achieving 91--98\% coverage on images spanning 5~cm to 4.78~m ground sampling distance without modifying SAM2's architecture or requiring any training data.
+
+The manuscript makes three contributions relevant to JAG's readership. First, the multi-pass pipeline breaks the coverage-quality trade-off inherent to single-pass SAM2, enabling near-complete unsupervised segmentation of arbitrarily large images. Second, the experimental evaluation across seven scenes and three datasets reveals that tile size functions as an implicit scale parameter, providing practitioners with a single interpretable configuration knob. Third, per-class analysis shows that SAM2's learned representations transfer well to discrete remote sensing objects (buildings 95\%, cars 93\% detection rate) but show lower performance on amorphous land cover classes, establishing concrete expectations for applying foundation models to Object-Based Image Analysis workflows.
+
+Remote SAMsing produces segment boundaries 3--8$\times$ more precise than SLIC and Felzenszwalb baselines, as measured by Boundary IoU, and achieves Achievable Segmentation Accuracy of 76--99\% across all tested scenes, including MNF false-color compositions that SAM2 was never trained on. The pipeline and all evaluation code are publicly available at \url{https://github.com/osmarluiz/sam-mosaic}.
+
+This manuscript has not been published or submitted elsewhere. All authors have approved the manuscript and agree with its submission to JAG.
+
+\vspace{1cm}
+\noindent Sincerely,
+
+\vspace{0.8cm}
+\noindent Osmar Luiz Ferreira de Carvalho\\
+Department of Electrical Engineering\\
+University of Bras\'{i}lia, Brazil\\
+\href{mailto:osmarcarvalho@ieee.org}{osmarcarvalho@ieee.org}
+
+\vspace{0.3cm}
+\noindent On behalf of all authors:\\
+Osmar Ab\'{i}lio de Carvalho J\'{u}nior, Anesmar Olino de Albuquerque, Daniel Guerreiro e Silva
+
+\end{document}

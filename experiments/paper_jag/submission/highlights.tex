@@ -1,0 +1,21 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{enumitem}
+
+\begin{document}
+
+\noindent\textbf{\Large Highlights}
+
+\vspace{0.5cm}
+\noindent\textbf{Remote SAMsing: From Segment Anything to Segment Everything}
+
+\vspace{0.5cm}
+\begin{itemize}[leftmargin=*,itemsep=6pt]
+    \item A multi-pass pipeline enables SAM2 to segment entire RS images without training data
+    \item Coverage reaches 91--98\% compared to 6--27\% with SAM2 default tiling
+    \item Segment boundaries are 3--8$\times$ more precise than SLIC and Felzenszwalb superpixels
+    \item Tile size controls a coverage-detection trade-off as an implicit scale parameter
+    \item Scalability validated on a 1.94 billion pixel mosaic producing 124{,}180 segments
+\end{itemize}
+
+\end{document}
