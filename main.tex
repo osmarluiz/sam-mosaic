@@ -264,8 +264,9 @@ Segmentation & $k$ (points\_per\_side) & 64 & Grid density ($k^2$ points) \\
              & Overlap rejection & 50\% & Max.\ overlap with existing segments \\
 \midrule
 Merge & Strategy & best\_match & Parameter-free best-match \\
-      & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
-      & merge\_enclosed\_max & 500 & Max.\ area for enclosed absorption \\
+\midrule
+Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
+           & merge\_enclosed\_max & 500 & Max.\ area for enclosed absorption \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -273,22 +274,24 @@ Merge & Strategy & best\_match & Parameter-free best-match \\
 \subsection{Experimental Design}
 \label{sec:exp_design}
 
-The evaluation examines three aspects of Remote SAMsing: the contribution of each pipeline component to coverage, the effect of tile size across scene types, and the quality of the generated segments relative to ground truth.
+The evaluation is organized into five experiments on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes:
 
-Multiple configurations isolate the role of each component. Three single-pass SAM2 baselines at $\tau = 0.93$, $0.88$ (SAM2 default), and $0.70$ provide reference coverage without multi-pass processing. Two additional single-pass configurations enable SAM2's built-in multi-scale mechanism (crop\_n\_layers $= 1$) at $\tau = 0.88$ and $0.70$, testing whether SAM2's native multi-resolution inference reduces the need for multi-pass processing. Two pipeline variants, each with one component disabled (black mask focusing off and adaptive decay off), are compared against the full configuration. The effect of contextual padding is evaluated qualitatively in Section~\ref{sec:res_merge}. These configurations are evaluated on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes. SamGeo2 \citep{wu2023samgeo}, which applies SAM2 with default tiling and no multi-pass pipeline, serves as a baseline for SAM2 without the proposed contributions.
-
-Component ablation is performed at the default tile size ($T = 1{,}000$) to isolate the effect of each component. Tile size variation uses the entire pipeline to isolate the effect of spatial scale. Tile size is varied at $T \in \{1{,}000, 500, 250\}$ on the same three scenes. $T = 1{,}000$ is a round value close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, ensuring minimal information loss during resize. $T = 500$ and $T = 250$ increase the relative scale of objects within each tile by $2\times$ and $4\times$, respectively.
-
-Segmentation quality is assessed using Achievable Segmentation Accuracy (ASA) for global superpixel quality and a greedy oracle protocol for per-object reconstruction quality. Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient} as traditional superpixel baselines, calibrated to approximate Remote SAMsing's segment count per dataset. Section~\ref{sec:exp_metrics} defines both protocols and the resulting metrics.
+\begin{enumerate}
+    \item \textbf{Pipeline configuration analysis.} Multiple configurations isolate the contribution of each component and the effect of tile size. Single-pass SAM2 baselines at $\tau = 0.93$, $0.88$ (SAM2 default), and $0.70$ provide reference coverage. Two additional single-pass configurations enable SAM2's built-in multi-scale mechanism (crop\_n\_layers $= 1$) at $\tau = 0.88$ and $0.70$. Two pipeline variants with one component disabled (black mask off, adaptive decay off) are compared against the full configuration. Tile size is varied at $T \in \{1{,}000, 500, 250\}$; $T = 1{,}000$ is close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, while $T = 500$ and $T = 250$ magnify objects by $2\times$ and $4\times$, respectively. SamGeo2 \citep{wu2023samgeo}, which applies SAM2 with default tiling and no multi-pass pipeline, serves as a reference.
+    \item \textbf{Boundary merge validation.} The best-match merge is compared against naive merging across all seven scenes, and the effect of contextual padding is evaluated qualitatively.
+    \item \textbf{Per-class segmentation quality.} At the best tile size per scene, segmentation quality is assessed per class using the greedy oracle protocol and ASA (Section~\ref{sec:exp_metrics}).
+    \item \textbf{Baseline comparison.} Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset, and against SamGeo2.
+    \item \textbf{Scalability.} The full pipeline is applied to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels) to validate operation at production scale.
+\end{enumerate}
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
 
-The evaluation addresses four aspects: scene completeness, segment-class alignment, per-object reconstruction quality, and boundary precision.
+Coverage (\%) reports the percentage of image pixels assigned to any segment. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} assigns each segment its majority GT class label and reports the fraction of pixels correctly labeled; high ASA indicates that segments do not leak across class boundaries.
 
-Coverage (\%) reports the percentage of image pixels assigned to any segment. Processing time is the total wall-clock time. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} assigns each segment its majority GT class label and reports the fraction of GT pixels correctly labeled. High ASA indicates that segments do not leak across class boundaries. For BSB-1 and Plant23, unannotated background is treated as a separate class.
+Per-object reconstruction is evaluated through a greedy oracle protocol adapted from \citet{clinton2010segmentation_eval}: for each GT polygon, segments are iteratively added to maximize IoU, stopping when no remaining segment improves the reconstruction. This protocol is parameter-free and accommodates both over-segmented and under-segmented objects. Det@0.5 (\%) reports the fraction of GT objects reconstructed with IoU $\geq 0.5$. SS-Det@0.5 applies the same threshold to the best single segment, so the gap between Det@0.5 and SS-Det@0.5 quantifies the merge contribution. Mean IoU (mIoU) averages greedy oracle IoU across all GT objects. Mean segments per object ($\bar{n}$) quantifies over-segmentation. Boundary IoU (BIoU) \citep{cheng2021boundary} restricts IoU to a narrow band ($d = 3$ pixels) around boundaries, capturing boundary precision that standard IoU misses.
 
-Per-object reconstruction is evaluated through a greedy oracle protocol adapted from \citet{clinton2010segmentation_eval}: for each GT polygon, segments are iteratively added to maximize IoU, stopping when no remaining segment improves the reconstruction. Unlike threshold-based overlap measures that require choosing an overlap cutoff, this procedure is parameter-free and accommodates both over-segmented objects (reconstructed from multiple segments) and under-segmented ones (single segment covering multiple objects) within the same evaluation framework. Det@0.5 (\%) reports the fraction of GT objects reconstructed with IoU $\geq 0.5$. Single-segment detection (SS-Det@0.5) applies the same threshold to the best individual segment, measuring whether single segments correspond to whole objects without merge; the gap between Det@0.5 and SS-Det@0.5 quantifies the contribution of the merge step. Mean IoU (mIoU) averages greedy oracle IoU across all GT objects including those with IoU $= 0$. Mean segments per object ($\bar{n}$) quantifies over-segmentation. Boundary IoU (BIoU) \citep{cheng2021boundary} restricts IoU to a narrow band ($d = 3$ pixels, following the default in Cheng et al.) around the merged reconstruction and GT polygon boundaries, capturing boundary precision that standard IoU misses. All experiments are fully deterministic: a fixed point grid, fixed thresholds, and SAM2's greedy mask selection produce identical output on repeated runs, so variance estimates are unnecessary.
+All experiments are fully deterministic, so variance estimates are unnecessary.
 
 % ============================================================================
 \section{Results}
