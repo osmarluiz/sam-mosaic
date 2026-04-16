@@ -170,7 +170,7 @@ After each pass, all segmented pixels are painted black, erasing captured object
 
 Prompts are then placed only on residual areas. The first pass uses a uniform $k \times k$ grid; subsequent passes regenerate the same grid but discard all points that fall on already-segmented pixels. This Dense Grid strategy maintains uniform point density across all residual regions, ensuring that small isolated fragments receive prompts even as the residual area shrinks across passes.
 
-SAM2 masks may contain disconnected regions, so each mask is split into 4-connected components and evaluated independently. Components smaller than $a_{\min}$ pixels are discarded, and components where more than half of the pixels overlap with existing segments are rejected as redundant. This prevents a useful mask from being discarded just because one of its disconnected fragments overlaps with an existing segment.
+SAM2 masks may contain disconnected regions, so each mask is split into its connected components and evaluated independently. Components smaller than $a_{\min}$ pixels are discarded, and components where more than half of the pixels overlap with existing segments are rejected as redundant. This prevents a useful mask from being discarded just because one of its disconnected fragments overlaps with an existing segment.
 
 \subsubsection{Adaptive Threshold Decay}
 \label{sec:method_threshold}
