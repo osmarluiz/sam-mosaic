@@ -269,17 +269,17 @@ Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
 \centering
 \caption{Evaluation metrics.}
 \label{tab:metrics}
-\begin{tabular}{lll}
+\begin{tabular}{llp{6.5cm}}
 \toprule
 Metric & Scope & Description \\
 \midrule
-Coverage (\%) & Scene & Fraction of pixels assigned to any segment \\
-ASA \citep{stutz2018superpixels} & Scene & Pixels correctly labeled when each segment receives its majority GT class \\
-Det@0.5 (\%) & Per-object & GT objects reconstructed with greedy oracle IoU $\geq 0.5$ \\
-SS-Det@0.5 (\%) & Per-object & GT objects matched by a single segment with IoU $\geq 0.5$ \\
-mIoU & Per-object & Mean greedy oracle IoU across all GT objects \\
-$\bar{n}$ & Per-object & Mean segments per object (over-segmentation) \\
-BIoU \citep{cheng2021boundary} & Per-object & IoU restricted to a $d = 3$ pixel band around boundaries \\
+Coverage (\%) & Scene & Pixels assigned to any segment \\
+ASA \citep{stutz2018superpixels} & Scene & Pixels correct when each segment receives its majority GT class \\
+Det@0.5 (\%) & Object & GT objects with greedy oracle IoU $\geq 0.5$ \\
+SS-Det@0.5 (\%) & Object & GT objects matched by a single segment (IoU $\geq 0.5$) \\
+mIoU & Object & Mean greedy oracle IoU \\
+$\bar{n}$ & Object & Mean segments per object \\
+BIoU \citep{cheng2021boundary} & Object & IoU in a $d = 3$\,px band around boundaries \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -287,12 +287,12 @@ BIoU \citep{cheng2021boundary} & Per-object & IoU restricted to a $d = 3$ pixel 
 \textbf{Ablation studies.}
 
 \begin{itemize}
-    \item \textit{Does multi-pass matter?} Single-pass SAM2 at $\tau = 0.93$, $0.88$, and $0.70$ vs.\ full pipeline.
-    \item \textit{Does SAM2's native multi-scale help?} Single-pass with crop\_n\_layers $= 1$ at $\tau = 0.88$ and $0.70$.
-    \item \textit{Which components contribute?} Full pipeline with black mask off and with adaptive decay off.
-    \item \textit{How does tile size affect quality?} Full pipeline at $T \in \{1{,}000, 500, 250\}$, magnifying objects by $1\times$, $2\times$, and $4\times$.
-    \item \textit{How does the pipeline compare to existing SAM tools?} SamGeo2 \citep{wu2023samgeo} with default configuration.
-    \item \textit{Does the merge strategy matter?} Best-match vs.\ naive merging across all seven scenes.
+    \item \textit{Multi-pass contribution:} single-pass SAM2 at $\tau = 0.93$, $0.88$, $0.70$ vs.\ full pipeline.
+    \item \textit{Native multi-scale:} single-pass with crop\_n\_layers $= 1$ at $\tau = 0.88$ and $0.70$.
+    \item \textit{Component ablation:} full pipeline with black mask off; adaptive decay off.
+    \item \textit{Tile size effect:} $T \in \{1{,}000, 500, 250\}$ ($1\times$, $2\times$, $4\times$ magnification).
+    \item \textit{Existing SAM tools:} SamGeo2 \citep{wu2023samgeo} with default configuration.
+    \item \textit{Merge strategy:} best-match vs.\ naive across all seven scenes.
 \end{itemize}
 
 \textbf{Quality evaluation.} At the best tile size per scene, segmentation quality is assessed per class. Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. A scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels).
