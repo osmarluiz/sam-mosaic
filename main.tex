@@ -133,7 +133,7 @@ If a pipeline achieves high coverage, SAM-based segments can function as superpi
 \label{sec:methodology}
 % ============================================================================
 
-Remote SAMsing addresses two problems. First, SAM2's single-pass inference leaves a substantial fraction of RS images unsegmented; Section~\ref{sec:method_multipass} describes the multi-pass algorithm that maximizes coverage within each tile by iteratively targeting residual unsegmented areas. Second, RS images routinely exceed SAM2's $1{,}024 \times 1{,}024$ input capacity; Section~\ref{sec:method_scaling} describes the tiling scheme, boundary merge algorithm, and post-processing that produce a spatially consistent segmentation of arbitrarily large images.
+Remote SAMsing addresses two problems. Within each tile, SAM2's single-pass inference leaves a substantial fraction of the image unsegmented, so a multi-pass algorithm (Section~\ref{sec:method_multipass}) progressively simplifies the scene to maximize coverage. Across tiles, objects that span boundaries must be reconciled into a consistent segmentation, which contextual padding and a parameter-free merge (Section~\ref{sec:method_scaling}) achieve for arbitrarily large images.
 
 % ----------------------------------------------------------------------------
 \subsection{Multi-Pass Adaptive Segmentation}
