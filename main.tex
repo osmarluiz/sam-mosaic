@@ -200,7 +200,7 @@ The merge pairs are processed by a Union-Find structure \citep{tarjan1975union} 
 \label{sec:experiments}
 % ============================================================================
 
-The evaluation assesses both the pipeline contributions (coverage and spatial consistency) and the practical configuration guidelines introduced as the third contribution. This section describes the datasets, implementation, experimental design, and evaluation metrics.
+The evaluation assesses both the pipeline contributions (coverage and spatial consistency) and the practical configuration guidelines introduced as the third contribution.
 
 \subsection{Study Areas and Datasets}
 \label{sec:exp_data}
@@ -263,22 +263,39 @@ Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
 \subsection{Experimental Design}
 \label{sec:exp_design}
 
-The evaluation is organized into five experiments on BSB-1, Potsdam-1, and Plant23, representing high-resolution urban (24~cm), ultra-high-resolution urban (5~cm), and agricultural (4.78~m) scenes:
+\label{sec:exp_metrics} All experiments are evaluated using the metrics in Table~\ref{tab:metrics}. Per-object metrics use a greedy oracle protocol adapted from \citet{clinton2010segmentation_eval}: for each GT polygon, segments are iteratively added to maximize IoU, accommodating both over-segmented and under-segmented objects. All experiments are fully deterministic, so variance estimates are unnecessary.
 
-\begin{enumerate}
-    \item \textbf{Pipeline configuration analysis.} Multiple configurations isolate the contribution of each component and the effect of tile size. Single-pass SAM2 baselines at $\tau = 0.93$, $0.88$ (SAM2 default), and $0.70$ provide reference coverage. Two additional single-pass configurations enable SAM2's built-in multi-scale mechanism (crop\_n\_layers $= 1$) at $\tau = 0.88$ and $0.70$. Two pipeline variants with one component disabled (black mask off, adaptive decay off) are compared against the full configuration. Tile size is varied at $T \in \{1{,}000, 500, 250\}$; $T = 1{,}000$ is close to SAM2's internal resolution of $1{,}024 \times 1{,}024$ pixels, while $T = 500$ and $T = 250$ magnify objects by $2\times$ and $4\times$, respectively. SamGeo2 \citep{wu2023samgeo}, which applies SAM2 with default tiling and no multi-pass pipeline, serves as a reference.
-    \item \textbf{Boundary merge validation.} The best-match merge is compared against naive merging across all seven scenes, and the effect of contextual padding is evaluated qualitatively.
-    \item \textbf{Per-class segmentation quality.} At the best tile size per scene, segmentation quality is assessed per class using the greedy oracle protocol and ASA (Section~\ref{sec:exp_metrics}).
-    \item \textbf{Baseline comparison.} Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset, and against SamGeo2.
-    \item \textbf{Scalability.} The full pipeline is applied to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels) to validate operation at production scale.
-\end{enumerate}
+\begin{table}[htbp]
+\centering
+\caption{Evaluation metrics.}
+\label{tab:metrics}
+\begin{tabular}{lll}
+\toprule
+Metric & Scope & Description \\
+\midrule
+Coverage (\%) & Scene & Fraction of pixels assigned to any segment \\
+ASA \citep{stutz2018superpixels} & Scene & Pixels correctly labeled when each segment receives its majority GT class \\
+Det@0.5 (\%) & Per-object & GT objects reconstructed with greedy oracle IoU $\geq 0.5$ \\
+SS-Det@0.5 (\%) & Per-object & GT objects matched by a single segment with IoU $\geq 0.5$ \\
+mIoU & Per-object & Mean greedy oracle IoU across all GT objects \\
+$\bar{n}$ & Per-object & Mean segments per object (over-segmentation) \\
+BIoU \citep{cheng2021boundary} & Per-object & IoU restricted to a $d = 3$ pixel band around boundaries \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Evaluation Metrics}
-\label{sec:exp_metrics}
+\textbf{Ablation studies.}
 
-Coverage (\%) reports the percentage of image pixels assigned to any segment. Achievable Segmentation Accuracy (ASA) \citep{stutz2018superpixels} assigns each segment its majority GT class label and reports the fraction of pixels correctly labeled; high ASA indicates that segments do not leak across class boundaries.
+\begin{itemize}
+    \item \textit{Does multi-pass matter?} Single-pass SAM2 at $\tau = 0.93$, $0.88$, and $0.70$ vs.\ full pipeline.
+    \item \textit{Does SAM2's native multi-scale help?} Single-pass with crop\_n\_layers $= 1$ at $\tau = 0.88$ and $0.70$.
+    \item \textit{Which components contribute?} Full pipeline with black mask off and with adaptive decay off.
+    \item \textit{How does tile size affect quality?} Full pipeline at $T \in \{1{,}000, 500, 250\}$, magnifying objects by $1\times$, $2\times$, and $4\times$.
+    \item \textit{How does the pipeline compare to existing SAM tools?} SamGeo2 \citep{wu2023samgeo} with default configuration.
+    \item \textit{Does the merge strategy matter?} Best-match vs.\ naive merging across all seven scenes.
+\end{itemize}
 
-Per-object reconstruction is evaluated through a greedy oracle protocol adapted from \citet{clinton2010segmentation_eval}: for each GT polygon, segments are iteratively added to maximize IoU, stopping when no remaining segment improves the reconstruction. This protocol is parameter-free and accommodates both over-segmented and under-segmented objects. Det@0.5 (\%) reports the fraction of GT objects reconstructed with IoU $\geq 0.5$. SS-Det@0.5 applies the same threshold to the best single segment, so the gap between Det@0.5 and SS-Det@0.5 quantifies the merge contribution. Mean IoU (mIoU) averages greedy oracle IoU across all GT objects. Mean segments per object ($\bar{n}$) quantifies over-segmentation. Boundary IoU (BIoU) \citep{cheng2021boundary} restricts IoU to a narrow band ($d = 3$ pixels) around boundaries, capturing boundary precision that standard IoU misses. All experiments are fully deterministic, so variance estimates are unnecessary.
+\textbf{Quality evaluation.} At the best tile size per scene, segmentation quality is assessed per class. Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. A scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels).
 
 % ============================================================================
 \section{Results}
