@@ -304,7 +304,7 @@ BIoU \citep{cheng2021boundary} & IoU restricted to a $d = 3$ pixel band around b
 \label{sec:results}
 % ============================================================================
 
-Fig.~\ref{fig:full_segmentation} shows the end result: three scenes that SAM2 alone would leave mostly unsegmented are now covered at 97--98\% with segments that follow individual objects rather than arbitrary pixel boundaries. The remainder of this section examines how each pipeline component contributes to this result, whether the boundary merge preserves object identity across tiles, how segment quality compares to traditional methods, and whether the pipeline scales to production-sized images.
+Fig.~\ref{fig:full_segmentation} illustrates the complete pipeline output on three scenes, achieving 97--98\% coverage with segments that follow individual objects rather than arbitrary pixel boundaries. The remainder of this section examines how each pipeline component contributes to this result (Section~\ref{sec:res_config}), whether the boundary merge preserves object identity across tiles (Section~\ref{sec:res_merge}), how segment quality varies per class (Section~\ref{sec:res_quality}), how it compares to traditional methods (Section~\ref{sec:res_baselines}), and whether the pipeline scales to production-sized images (Section~\ref{sec:res_scalability}).
 
 \begin{figure}[p]
     \centering
@@ -366,7 +366,9 @@ $T = 250$ & 97.8 & 66{,}253 & 85.1 & .543 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4
 
 Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 3--20~pp (19.7~pp on BSB-1). The black mask adds 4--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions.
 
-At $T = 1{,}000$, however, the full pipeline achieves higher coverage than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but lower Det@0.5 (56\% vs.\ 65\%). Late multi-pass iterations at relaxed thresholds generate large segments that cover residual areas but extend beyond individual object footprints, reducing per-object detection. Reducing tile size resolves this trade-off on scenes with small objects (Fig.~\ref{fig:ablation_visual}). On BSB-1, Det@0.5 increases from 56\% ($T = 1{,}000$) to 85\% ($T = 250$) and BIoU improves from 0.20 to 0.54, as smaller tiles magnify each object in SAM2's fixed $1{,}024 \times 1{,}024$ internal resolution. The per-car analysis (Fig.~\ref{fig:tilesize_cars}) shows that at $T = 1{,}000$, 51\% of cars are partially segmented and 5\% are absorbed into mega-segments, while at $T = 250$, 81\% are individually detected.
+High coverage comes at a cost: at $T = 1{,}000$, the full pipeline covers more than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but detects fewer individual objects (56\% vs.\ 65\% Det@0.5), because late passes at relaxed thresholds produce large segments that span multiple objects (Fig.~\ref{fig:ablation_visual}).
+
+Reducing tile size resolves this trade-off. Smaller tiles magnify objects in SAM2's fixed $1{,}024 \times 1{,}024$ internal resolution, and on BSB-1, Det@0.5 rises from 56\% ($T = 1{,}000$) to 85\% ($T = 250$) with BIoU improving from 0.20 to 0.54. The per-car analysis (Fig.~\ref{fig:tilesize_cars}) illustrates this concretely: at $T = 1{,}000$, 51\% of cars are partially segmented, while at $T = 250$, 81\% are individually detected.
 
 SAM2's built-in multi-scale mechanism (crop\_n\_layers $= 1$) offers an alternative approach, but tile size reduction proves more effective. Combining multi-pass with crop\_n\_layers at $T = 1{,}000$ improves Det@0.5 by 6~pp over multi-pass alone on BSB-1, while reducing tile size to $T = 250$ improves Det@0.5 by 29~pp at comparable processing time (18~h vs.\ 11.6~h). On Plant23, crop\_n\_layers fragments large agricultural fields, decreasing BIoU from 0.78 to 0.58.
 
