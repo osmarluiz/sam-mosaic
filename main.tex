@@ -445,11 +445,11 @@ Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 & +150 \\
 \label{sec:res_quality}
 % ----------------------------------------------------------------------------
 
-Based on the configuration analysis in Section~\ref{sec:res_config}, this section evaluates Dense Grid $T = 250$ for BSB-1 (27{,}427 segments, 97.8\% pixel coverage), Dense Grid $T = 1{,}000$ for Potsdam-1 (2{,}388 segments, 97.1\%), and Dense Grid $T = 1{,}000$ for Plant23 (4{,}533 segments, 98.1\%). The 2--3\% of uncovered pixels are penalized as background (``Other'' class) in ASA computation and counted as missed objects in per-object evaluation. Per-class evaluation reveals that detection quality varies with object morphology (Table~\ref{tab:perobject}).
+Per-class evaluation at the best tile size per scene (Table~\ref{tab:perobject}) reveals that detection quality depends strongly on object morphology.
 
 \begin{table}[htbp]
 \centering
-\caption{Remote SAMsing per-class evaluation (greedy oracle protocol). Det@0.5 = detection rate at IoU $\geq 0.5$ (\%) using greedy oracle reconstruction, SS-Det@0.5 = detection rate using best single segment, mIoU = mean greedy oracle IoU, BIoU = Boundary IoU of merged reconstruction, ASA = per-class Achievable Segmentation Accuracy (\%), $\bar{n}$ = mean segments per object.}
+\caption{Per-class evaluation using the greedy oracle protocol. Metrics defined in Table~\ref{tab:metrics}.}
 \label{tab:perobject}
 \scriptsize
 \begin{tabular}{lrrrrrrr}
@@ -495,9 +495,9 @@ Lakes       &      73 & 89.0 & 89.0 & 0.888 & 0.773 & 94.0 & 1.2 \\
 \end{tabular}
 \end{table}
 
-Objects with well-defined shapes achieve high detection rates. Buildings reach 95\% Det@0.5 on BSB-1 and Potsdam-1, cars 82\% (BSB-1) and 93\% (Potsdam-1), and agricultural fields 95--100\% (mIoU 0.95--1.00). These classes are reconstructed with $\bar{n}$ close to 1.0, indicating near-perfect one-segment-per-object correspondence. On Plant23, pivot irrigation fields achieve 100\% Det@0.5 with BIoU 0.98 despite the MNF false-color composition.
+Discrete objects with well-defined shapes achieve high detection: buildings 95\% Det@0.5 on both BSB-1 and Potsdam-1, cars 82--93\%, and agricultural fields 95--100\% with near-perfect one-segment-per-object correspondence ($\bar{n} \approx 1.0$). On Plant23, pivot irrigation fields reach 100\% Det@0.5 with BIoU 0.98 despite the MNF false-color composition.
 
-Detection varies with object morphology, following the distinction between ``things'' (objects) and ``stuff'' (amorphous regions) \citep{kirillov2019panoptic}. On Potsdam-1, things (buildings 95\%, cars 93\%) achieve high Det@0.5, while stuff classes (impervious 42\%, low vegetation 37\%) score lower. However, per-class ASA reveals that pixel-level classification remains accurate for stuff: impervious surfaces achieve 75\% ASA despite 42\% Det@0.5. Roads on BSB-1 reach 79\% Det@0.5 but 88\% ASA, meaning the road pixels are correctly classified, but the elongated GT polygons spanning multiple tiles are not reconstructed as single objects.
+Amorphous land cover classes score lower on Det@0.5, following the ``things'' vs.\ ``stuff'' distinction \citep{kirillov2019panoptic}: on Potsdam-1, impervious surfaces reach only 42\% and low vegetation 37\%. However, this does not indicate segmentation failure. Per-class ASA remains high (impervious 75\%, low vegetation 76\%), meaning the pixels are correctly assigned but the elongated or irregular GT polygons are not reconstructed as single objects. Roads on BSB-1 illustrate this: 79\% Det@0.5 but 88\% ASA.
 
 \FloatBarrier
 % ----------------------------------------------------------------------------
