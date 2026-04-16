@@ -140,9 +140,7 @@ Remote SAMsing addresses two problems. Within each tile, SAM2's single-pass infe
 \label{sec:method_multipass}
 % ----------------------------------------------------------------------------
 
-SAM2's Automatic Mask Generator (AMG) processes each input point independently and returns all masks that exceed the quality thresholds in a single forward pass. A single pass with high-quality thresholds captures only the most salient objects, leaving a large fraction of the image unsegmented. Lowering the thresholds to compensate introduces noisy and low-quality masks. The multi-pass strategy resolves this tension by iteratively focusing SAM2 on residual unsegmented areas while progressively relaxing quality thresholds only when progress stagnates.
-
-The first pass runs SAM2's standard AMG on the unmodified tile image with a uniform $k \times k$ point grid at the strictest thresholds ($\tau = \tau_{\text{start}}$). From the second pass onward, each iteration processes the residual unsegmented areas through scene simplification, targeted prompting, and mask filtering (Section~\ref{sec:method_pass}), while adaptive threshold decay (Section~\ref{sec:method_threshold}) governs when quality thresholds relax between passes. The loop continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Algorithm~\ref{alg:multipass} formalizes the complete procedure.
+The first pass runs SAM2's AMG on the unmodified tile with a uniform $k \times k$ point grid at the strictest thresholds ($\tau = \tau_{\text{start}}$). Subsequent passes simplify the scene and re-run SAM2 on residual areas (Section~\ref{sec:method_pass}), with thresholds relaxing only when progress stagnates (Section~\ref{sec:method_threshold}). The loop continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Algorithm~\ref{alg:multipass} formalizes the procedure.
 
 \begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
