@@ -10,27 +10,29 @@
 \noindent Dear Editor,
 
 \vspace{0.5cm}
-\noindent Please find enclosed the manuscript entitled \textbf{``Remote SAMsing: From Segment Anything to Segment Everything''} for consideration as a research article in the \textit{International Journal of Applied Earth Observation and Geoinformation}.
+\noindent We submit the manuscript \textbf{``Remote SAMsing: From Segment Anything to Segment Everything''} for consideration as a research article in the \textit{International Journal of Applied Earth Observation and Geoinformation}.
 
-This manuscript addresses a practical gap in applying the Segment Anything Model 2 (SAM2) to remote sensing: while SAM2 produces high-quality masks on individual image patches, it leaves 30--70\% of a typical remote sensing image unsegmented and provides no mechanism for reconciling masks across tile boundaries. Remote SAMsing solves both problems through a multi-pass algorithm with adaptive threshold decay and a parameter-free boundary merge, achieving 91--98\% coverage on images spanning 5~cm to 4.78~m ground sampling distance without modifying SAM2's architecture or requiring any training data.
+SAM2, the most widely adopted foundation model for image segmentation, cannot segment a large remote sensing image on its own. A single pass with its default settings leaves 30--70\% of the scene without any mask, and tiling the image produces fragmented segments at every tile boundary with no mechanism to reconcile them. These two problems prevent SAM2 from being used as a practical tool for Object-Based Image Analysis. Remote SAMsing solves both: a multi-pass algorithm with black mask focusing and adaptive threshold decay raises coverage to 91--98\%, and a parameter-free boundary merge produces a single consistent label map for images of any size.
 
-The manuscript makes three contributions relevant to JAG's readership. First, the multi-pass pipeline breaks the coverage-quality trade-off inherent to single-pass SAM2, enabling near-complete unsupervised segmentation of arbitrarily large images. Second, the experimental evaluation across seven scenes and three datasets reveals that tile size functions as an implicit scale parameter, providing practitioners with a single interpretable configuration knob. Third, per-class analysis shows that SAM2's learned representations transfer well to discrete remote sensing objects (buildings 95\%, cars 93\% detection rate) but show lower performance on amorphous land cover classes, establishing concrete expectations for applying foundation models to Object-Based Image Analysis workflows.
+What sets this work apart from existing SAM-based remote sensing studies is the scope of the problem it addresses. Prior work focuses on improving per-object mask quality on individual patches. Remote SAMsing is, to our knowledge, the first pipeline that takes a large remote sensing image as input and produces a complete, spatially consistent segmentation as output, without requiring training data or architectural modifications to SAM2. The experimental evaluation spans seven scenes across three spatial resolutions (5~cm to 4.78~m GSD), two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural). A scalability test on a full Potsdam mosaic of $36{,}000 \times 54{,}000$ pixels (1.94 billion pixels) produced 124{,}180 segments at 97\% coverage with 81.8\% Achievable Segmentation Accuracy, confirming that the pipeline operates at production scale on a single consumer GPU.
 
-Remote SAMsing produces segment boundaries 3--8$\times$ more precise than SLIC and Felzenszwalb baselines, as measured by Boundary IoU, and achieves Achievable Segmentation Accuracy of 76--99\% across all tested scenes, including MNF false-color compositions that SAM2 was never trained on. A scalability test on a full Potsdam mosaic ($36{,}000 \times 54{,}000$ pixels, 1.94 billion pixels) produced 124{,}180 segments at 97\% coverage, confirming that the pipeline operates at production scale. The pipeline and all evaluation code are publicly available at \url{https://github.com/osmarluiz/sam-mosaic}.
+The analysis also reveals a finding of practical value: tile size functions as an implicit scale parameter that controls a trade-off between coverage and per-object detection quality. Reducing tile size from 1{,}000 to 250 pixels raises detection from 56\% to 85\% on urban scenes with small objects, outperforming SAM2's own built-in multi-scale mechanism at comparable processing time. This gives practitioners a single, interpretable knob to adapt the pipeline to different scene types.
 
-This manuscript has not been published or submitted elsewhere. All authors have approved the manuscript and agree with its submission to JAG.
+Remote SAMsing achieves Boundary IoU 3--8$\times$ higher than SLIC and Felzenszwalb baselines across all tested scenes, indicating that SAM2's learned boundaries align with objects far more precisely than spectral-based segmentation methods. The pipeline and all evaluation code are publicly available at \url{https://github.com/osmarluiz/sam-mosaic}.
+
+This manuscript has not been published or submitted elsewhere. All authors have approved the manuscript and agree with its submission.
 
 \vspace{1cm}
 \noindent Sincerely,
 
 \vspace{0.8cm}
-\noindent Osmar Luiz Ferreira de Carvalho\\
-Department of Electrical Engineering\\
+\noindent Prof.\ Dr.\ Osmar Ab\'{i}lio de Carvalho J\'{u}nior\\
+Department of Geography\\
 University of Bras\'{i}lia, Brazil\\
-\href{mailto:osmarcarvalho@ieee.org}{osmarcarvalho@ieee.org}
+\href{mailto:osmarjr@unb.br}{osmarjr@unb.br}
 
 \vspace{0.3cm}
 \noindent On behalf of all authors:\\
-Osmar Ab\'{i}lio de Carvalho J\'{u}nior, Anesmar Olino de Albuquerque, Daniel Guerreiro e Silva
+Osmar Luiz Ferreira de Carvalho, Anesmar Olino de Albuquerque, Daniel Guerreiro e Silva
 
 \end{document}
