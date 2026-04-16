@@ -146,18 +146,18 @@ The first pass runs SAM2's AMG on the unmodified tile with a uniform $k \times k
 \caption{Multi-pass adaptive segmentation (per tile)}
 \label{alg:multipass}
 \begin{algorithmic}[1]
-\REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, target coverage
+\REQUIRE Tile image $I$, thresholds $\tau_{\text{start}}$ and $\tau_{\text{end}}$, decay step $\Delta$, stagnation threshold $\varepsilon$, target coverage
 \ENSURE Label map $L$
 \STATE $\tau \leftarrow \tau_{\text{start}}$
-\STATE Run SAM2 on $I$ with uniform $k \times k$ grid at $\tau$; assign labels; compute coverage
+\STATE Run SAM2 on $I$ with $k \times k$ point grid at $\tau$; assign labels
 \REPEAT
-    \STATE Mask segmented pixels to black in $I$
-    \STATE Generate points on residual area (Dense Grid)
-    \STATE Run SAM2 at $\tau$; accept qualifying masks; update coverage
-    \IF{coverage gain $< 0.1$ pp}
+    \STATE Paint segmented pixels black in $I$
+    \STATE Place prompts on residual areas
+    \STATE Run SAM2 at $\tau$; accept and assign new masks
+    \IF{coverage gain $< \varepsilon$}
         \STATE $\tau \leftarrow \tau - \Delta$
     \ENDIF
-\UNTIL{coverage $\geq$ target \OR $\tau < \tau_{\text{end}}$ \OR max passes reached}
+\UNTIL{coverage $\geq$ target \OR $\tau < \tau_{\text{end}}$}
 \RETURN $L$
 \end{algorithmic}
 \end{algorithm}
