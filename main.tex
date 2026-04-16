@@ -69,7 +69,7 @@ This gap persists because of two problems inherent to applying SAM2 to large RS 
 This paper presents Remote SAMsing, an open-source pipeline that addresses both problems without modifying SAM2's architecture or training task-specific prompt generators:
 
 \begin{enumerate}
-    \item \textbf{Coverage.} A multi-pass algorithm with black mask focusing and adaptive threshold decay breaks the coverage-quality trade-off: strict thresholds capture the most salient objects first, and relaxation occurs only when progress stagnates, so the majority of segments retain high quality while achieving near-complete coverage.
+    \item \textbf{Coverage.} A multi-pass algorithm with black mask and adaptive threshold decay breaks the coverage-quality trade-off: strict thresholds capture the most salient objects first, and relaxation occurs only when progress stagnates, so the majority of segments retain high quality while achieving near-complete coverage.
     \item \textbf{Spatial consistency.} Contextual padding ensures accurate segmentation near tile edges, and a parameter-free best-match merge with Union-Find unifies boundary fragments in linear time, producing a single consistent label map for arbitrarily large images with constant GPU memory.
     \item \textbf{Experimental analysis.} No existing work provides practical guidelines for configuring SAM2 on large RS images. A systematic evaluation across seven scenes spanning three spatial resolutions (5~cm to 4.78~m), two spectral compositions, and two landscape types fills this gap, revealing that tile size controls a coverage-detection trade-off that is more effective and cheaper than SAM2's built-in multi-scale inference, and establishing configuration principles that generalize across scene types.
 \end{enumerate}
@@ -142,7 +142,7 @@ Remote SAMsing addresses two problems. First, SAM2's single-pass inference leave
 
 SAM2's Automatic Mask Generator (AMG) processes each input point independently and returns all masks that exceed the quality thresholds in a single forward pass. A single pass with high-quality thresholds captures only the most salient objects, leaving a large fraction of the image unsegmented. Lowering the thresholds to compensate introduces noisy and low-quality masks. The multi-pass strategy resolves this tension by iteratively focusing SAM2 on residual unsegmented areas while progressively relaxing quality thresholds only when progress stagnates.
 
-The first pass runs SAM2's standard AMG on the unmodified tile image with a uniform $k \times k$ point grid at the strictest thresholds ($\tau = \tau_{\text{start}}$). From the second pass onward, four mechanisms redirect SAM2 toward residual unsegmented areas: \textit{black mask focusing} renders already-segmented pixels as featureless, \textit{point sampling} generates prompts exclusively on unsegmented areas, \textit{mask acceptance} filters redundant or small masks, and \textit{adaptive threshold decay} relaxes quality thresholds when progress stagnates. The loop continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Algorithm~\ref{alg:multipass} formalizes the complete procedure; the following subsections detail each mechanism.
+The first pass runs SAM2's standard AMG on the unmodified tile image with a uniform $k \times k$ point grid at the strictest thresholds ($\tau = \tau_{\text{start}}$). From the second pass onward, each iteration processes the residual unsegmented areas through scene simplification, targeted prompting, and mask filtering (Section~\ref{sec:method_pass}), while adaptive threshold decay (Section~\ref{sec:method_threshold}) governs when quality thresholds relax between passes. The loop continues until coverage reaches the target, thresholds are exhausted, or the maximum number of passes is reached. Algorithm~\ref{alg:multipass} formalizes the complete procedure.
 
 \begin{algorithm}[h!]
 \caption{Multi-pass adaptive segmentation (per tile)}
@@ -164,21 +164,15 @@ The first pass runs SAM2's standard AMG on the unmodified tile image with a unif
 \end{algorithmic}
 \end{algorithm}
 
-\pagebreak
-\subsubsection{Black Mask Focusing}
+\subsubsection{Per-Pass Processing}
+\label{sec:method_pass}
 \label{sec:method_blackmask}
 
-After each pass, all pixels assigned to a segment are set to black $(0, 0, 0)$, producing two effects. First, SAM2 generates few or no mask candidates over uniform black regions, concentrating predictions on the remaining unsegmented areas and preventing repeated segmentation of the same prominent objects. Second, the abrupt transition between the black mask and the remaining image content creates an artificial boundary that SAM2 treats as an object edge. New masks generated in subsequent passes naturally terminate at the border of previously segmented areas, producing segments that complement rather than overlap with existing ones. The ablation study (Section~\ref{sec:res_ablation}) quantifies the coverage contribution. The black mask operates on the image seen by SAM2; point sampling (Section~\ref{sec:method_points}) separately ensures that prompt points are placed only on unsegmented areas. These two mechanisms are complementary: point sampling controls where prompts are placed, while the black mask controls what SAM2 sees.
+After each pass, all segmented pixels are painted black, erasing captured objects from the image. The scene grows simpler with each iteration: objects that were previously too subtle for SAM2 to detect become the most prominent features in what remains. This simplification operates through two mechanisms: SAM2 generates few or no mask candidates over uniform black regions, preventing repeated segmentation of the same objects, and the abrupt transition between the black mask and the remaining content creates an artificial boundary that SAM2 treats as an object edge, so new masks naturally complement rather than overlap with existing ones.
 
-\subsubsection{Point Sampling}
-\label{sec:method_points}
+Prompts are then placed only on residual areas. The first pass uses a uniform $k \times k$ grid; subsequent passes regenerate the same grid but discard all points that fall on already-segmented pixels. This Dense Grid strategy maintains uniform point density across all residual regions, ensuring that small isolated fragments receive prompts even as the residual area shrinks across passes.
 
-The first pass uses a uniform $k \times k$ grid. For subsequent passes, the same grid is regenerated but all points that fall on already-segmented pixels are discarded. This Dense Grid strategy maintains uniform point density across all residual regions regardless of their size, ensuring that small isolated fragments receive prompts even as the residual area shrinks and fragments across passes.
-
-\subsubsection{Mask Acceptance Criteria}
-\label{sec:method_acceptance}
-
-Each SAM2 mask may contain disconnected regions. The algorithm splits every mask into 4-connected components and evaluates each independently: components smaller than $a_{\min}$ pixels are discarded, and components where more than half of the pixels are already covered by existing segments are rejected as redundant. This per-component evaluation prevents a large mask from being rejected solely because one of its disconnected fragments overlaps with an existing segment.
+SAM2 masks may contain disconnected regions, so each mask is split into 4-connected components and evaluated independently. Components smaller than $a_{\min}$ pixels are discarded, and components where more than half of the pixels overlap with existing segments are rejected as redundant. This prevents a useful mask from being discarded just because one of its disconnected fragments overlaps with an existing segment.
 
 \subsubsection{Adaptive Threshold Decay}
 \label{sec:method_threshold}
@@ -623,7 +617,7 @@ As discussed in Section~\ref{sec:disc_config}, tile sizes below $T = 1{,}000$ at
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presented Remote SAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images without modifying SAM2's architecture or weights. A multi-pass algorithm with black mask focusing and adaptive threshold decay raises coverage from 30--68\% (single-pass SAM2) to 91--98\% by progressively simplifying the scene so that previously undetectable objects emerge in later passes. Contextual padding and a parameter-free best-match merge produce spatially consistent mosaics across tile boundaries while preserving individual object identity. Without this pipeline, SAM2 with default tiling (SamGeo2) achieves only 6--27\% coverage.
+This paper presented Remote SAMsing, an open-source pipeline that enables SAM2-based unsupervised segmentation of arbitrarily large remote sensing images without modifying SAM2's architecture or weights. A multi-pass algorithm with black mask and adaptive threshold decay raises coverage from 30--68\% (single-pass SAM2) to 91--98\% by progressively simplifying the scene so that previously undetectable objects emerge in later passes. Contextual padding and a parameter-free best-match merge produce spatially consistent mosaics across tile boundaries while preserving individual object identity. Without this pipeline, SAM2 with default tiling (SamGeo2) achieves only 6--27\% coverage.
 
 Across seven scenes spanning 5~cm to 4.78~m GSD, Remote SAMsing achieves Det@0.5 of 62--96\% and ASA of 76--99\%, outperforming SLIC, Felzenszwalb, and SamGeo2 on all evaluated classes. SAM2 transfers particularly well to discrete objects (buildings 95\%, cars 93\% Det@0.5) but shows lower detection on amorphous land cover classes, consistent with the things-stuff distinction in panoptic segmentation. Tile size functions as an implicit scale parameter: reducing $T$ from $1{,}000$ to 250 raises Det@0.5 from 56\% to 85\% on BSB-1, proving more effective than SAM2's built-in multi-scale inference (crop\_n\_layers), which improves detection by only 6~pp at 3--5$\times$ the processing cost. Excessively small tiles cause merge chaining, establishing a practical minimum ground coverage of approximately 50~m per tile side. The pipeline also generalizes beyond natural RGB, reaching 99.5\% ASA on MNF false-color imagery, indicating that SAM2 responds to spatial gradients rather than spectral semantics. A scalability test on the full Potsdam dataset ($36{,}000 \times 54{,}000$ pixels, 1.94 billion pixels) produced 124{,}180 segments at 97\% coverage with 81.8\% ASA, confirming operation at production scale.
 
