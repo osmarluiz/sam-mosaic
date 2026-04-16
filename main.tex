@@ -263,7 +263,7 @@ Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
 \subsection{Experimental Design}
 \label{sec:exp_design}
 
-\label{sec:exp_metrics} All experiments are evaluated using the metrics in Table~\ref{tab:metrics}. Per-object metrics use a greedy oracle protocol adapted from \citet{clinton2010segmentation_eval}: for each GT polygon, segments are iteratively added to maximize IoU, accommodating both over-segmented and under-segmented objects. All experiments are fully deterministic, so variance estimates are unnecessary.
+\label{sec:exp_metrics} All experiments are evaluated using the metrics in Table~\ref{tab:metrics}. Since SAM2 segments visually coherent regions rather than semantic objects, a single building may produce separate roof and shadow segments without this being a failure. Per-object metrics therefore use a greedy oracle protocol adapted from \citet{clinton2010segmentation_eval}: for each GT polygon, segments are greedily combined to maximize the reconstructed IoU, so an over-segmented object achieves high IoU as long as its fragments together cover the GT polygon without leaking into adjacent classes. All experiments are fully deterministic, so variance estimates are unnecessary.
 
 \begin{table}[htbp]
 \centering
