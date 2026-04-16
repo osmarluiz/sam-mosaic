@@ -237,6 +237,7 @@ All experiments use the SAM2.1 model with the Hiera Large backbone, the largest 
 \centering
 \caption{Default pipeline configuration parameters.}
 \label{tab:default_config}
+\scriptsize
 \begin{tabular}{llrl}
 \toprule
 Module & Parameter & Default & Description \\
@@ -269,6 +270,7 @@ Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
 \centering
 \caption{Evaluation metrics.}
 \label{tab:metrics}
+\scriptsize
 \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llp{9cm}}
 \toprule
 Metric & Scope & Description \\
@@ -284,7 +286,7 @@ BIoU \citep{cheng2021boundary} & Object & IoU restricted to a $d = 3$ pixel band
 \end{tabular*}
 \end{table}
 
-\textbf{Ablation studies.}
+\subsubsection{Ablation Studies}
 
 \begin{itemize}
     \item \textit{Multi-pass contribution:} single-pass SAM2 at $\tau = 0.93$, $0.88$, $0.70$ vs.\ full pipeline.
@@ -295,7 +297,7 @@ BIoU \citep{cheng2021boundary} & Object & IoU restricted to a $d = 3$ pixel band
     \item \textit{Merge strategy:} best-match vs.\ naive across all seven scenes.
 \end{itemize}
 
-\textbf{Quality evaluation.} At the best tile size per scene, segmentation quality is assessed per class. Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. A scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels).
+\subsubsection{Quality Evaluation} At the best tile size per scene, segmentation quality is assessed per class. Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. A scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels).
 
 % ============================================================================
 \section{Results}
