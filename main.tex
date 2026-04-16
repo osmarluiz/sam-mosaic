@@ -364,13 +364,9 @@ $T = 250$ & 97.8 & 66{,}253 & 85.1 & .543 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4
     \label{fig:multipass_progression}
 \end{figure}
 
-Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 3--20~pp (19.7~pp on BSB-1). The black mask adds 4--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions.
+Adaptive threshold decay is the largest single contributor: disabling it reduces coverage by 3--20~pp (19.7~pp on BSB-1). The black mask adds 4--11~pp by preventing SAM2 from repeatedly generating masks for already-segmented regions. High coverage comes at a cost, however: at $T = 1{,}000$, the full pipeline covers more than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but detects fewer individual objects (56\% vs.\ 65\% Det@0.5), because late passes at relaxed thresholds produce large segments that span multiple objects (Fig.~\ref{fig:ablation_visual}).
 
-High coverage comes at a cost: at $T = 1{,}000$, the full pipeline covers more than the no-black-mask variant (91\% vs.\ 80\% on BSB-1) but detects fewer individual objects (56\% vs.\ 65\% Det@0.5), because late passes at relaxed thresholds produce large segments that span multiple objects (Fig.~\ref{fig:ablation_visual}).
-
-Reducing tile size resolves this trade-off. Smaller tiles magnify objects in SAM2's fixed $1{,}024 \times 1{,}024$ internal resolution, and on BSB-1, Det@0.5 rises from 56\% ($T = 1{,}000$) to 85\% ($T = 250$) with BIoU improving from 0.20 to 0.54. The per-car analysis (Fig.~\ref{fig:tilesize_cars}) illustrates this concretely: at $T = 1{,}000$, 51\% of cars are partially segmented, while at $T = 250$, 81\% are individually detected.
-
-SAM2's built-in multi-scale mechanism (crop\_n\_layers $= 1$) offers an alternative approach, but tile size reduction proves more effective. Combining multi-pass with crop\_n\_layers at $T = 1{,}000$ improves Det@0.5 by 6~pp over multi-pass alone on BSB-1, while reducing tile size to $T = 250$ improves Det@0.5 by 29~pp at comparable processing time (18~h vs.\ 11.6~h). On Plant23, crop\_n\_layers fragments large agricultural fields, decreasing BIoU from 0.78 to 0.58.
+Reducing tile size resolves this trade-off. Smaller tiles magnify objects in SAM2's fixed $1{,}024 \times 1{,}024$ internal resolution, and on BSB-1, Det@0.5 rises from 56\% ($T = 1{,}000$) to 85\% ($T = 250$) with BIoU improving from 0.20 to 0.54. The per-car analysis (Fig.~\ref{fig:tilesize_cars}) illustrates this concretely: at $T = 1{,}000$, 51\% of cars are partially segmented, while at $T = 250$, 81\% are individually detected. SAM2's built-in multi-scale mechanism (crop\_n\_layers $= 1$) offers an alternative, but tile size reduction proves more effective: crop\_n\_layers improves Det@0.5 by 6~pp on BSB-1 at $T = 1{,}000$, while reducing tile size to $T = 250$ improves it by 29~pp at comparable processing time (18~h vs.\ 11.6~h). On Plant23, crop\_n\_layers also fragments large agricultural fields, decreasing BIoU from 0.78 to 0.58.
 
 Smaller tiles do not improve quality on all scenes. On Plant23, BIoU drops from 0.89 ($T = 1{,}000$) to 0.40 ($T = 250$), and on Potsdam-1 Det@0.5 drops from 62\% to 50\%, as tiles covering too little ground area produce single-segment outputs that chain through the merge algorithm into mega-segments. This degradation does not occur on BSB-1, where $T = 250$ covers $60 \times 60$~m with sufficient object diversity per tile. The optimal tile size is therefore scene-dependent: the per-class evaluation in Section~\ref{sec:res_quality} adopts $T = 250$ for BSB-1 (maximizing small-object detection at 24~cm GSD) and $T = 1{,}000$ for Potsdam-1 and Plant23 (avoiding merge chaining).
 
@@ -505,7 +501,7 @@ Amorphous land cover classes score lower on Det@0.5, following the ``things'' vs
 \label{sec:res_baselines}
 % ----------------------------------------------------------------------------
 
-Table~\ref{tab:baselines} compares Remote SAMsing against SLIC superpixels \citep{achanta2012slic}, Felzenszwalb graph-based segmentation \citep{felzenszwalb2004efficient}, and SamGeo2 \citep{wu2023samgeo}. SLIC $n_\text{segments}$ is set to approximate Remote SAMsing's count; Felzenszwalb scale is calibrated similarly (see caption). On BSB-1 (Fig.~\ref{fig:baselines_visual}), Remote SAMsing produces segments aligned with individual objects, while SLIC and Felzenszwalb cut across or ignore object boundaries.
+To test whether SAM2-based segments are genuinely better than traditional alternatives, Remote SAMsing is compared against SLIC \citep{achanta2012slic}, Felzenszwalb \citep{felzenszwalb2004efficient}, and SamGeo2 \citep{wu2023samgeo}, with SLIC and Felzenszwalb calibrated to produce a similar segment count (Table~\ref{tab:baselines}). On BSB-1 (Fig.~\ref{fig:baselines_visual}), the difference is immediate: Remote SAMsing produces segments aligned with individual objects, while SLIC and Felzenszwalb cut across or ignore object boundaries.
 
 \begin{figure}[htbp]
     \centering
@@ -558,9 +554,7 @@ Lakes     & 23.3 & .227 & .144 & 35.6 & .464 & .076 & 64.4 & .642 & .226 & \text
 \end{tabular}
 \end{table}
 
-Remote SAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated classes across all three datasets. The BIoU gap is particularly large: Remote SAMsing achieves global BIoU of 0.18--0.89, while SLIC (0.06--0.14), Felzenszwalb (0.07--0.14), and SamGeo2 (0.05--0.21) remain consistently below 0.21, indicating that SAM2's learned representations produce boundaries that align much more precisely with object contours.
-
-SamGeo2 achieves only 7--29\% global Det@0.5 across datasets, confirming that SAM2 without multi-pass processing is insufficient for RS segmentation. SLIC produces uniform superpixels that cannot resolve small objects (2.0\% Det@0.5 for cars on BSB-1). Felzenszwalb follows spectral gradients but produces low boundary alignment (global BIoU 0.07--0.14).
+Remote SAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated classes across all three datasets. The BIoU gap is the most revealing: Remote SAMsing reaches 0.18--0.89 globally, while SLIC, Felzenszwalb, and SamGeo2 remain below 0.21, confirming that SAM2's learned representations place boundaries along object contours rather than spectral gradients. SamGeo2 achieves only 7--29\% Det@0.5 without the multi-pass pipeline, SLIC cannot resolve small objects (2.0\% Det@0.5 for cars on BSB-1), and Felzenszwalb follows spectral similarity rather than object structure (global BIoU 0.07--0.14).
 
 \FloatBarrier
 % ----------------------------------------------------------------------------
