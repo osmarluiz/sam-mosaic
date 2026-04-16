@@ -184,13 +184,6 @@ class Pipeline:
         tile_stats = []
         tile_start_time = time.time()
 
-        # Tile cache for resume capability: if a previous run crashed,
-        # re-running the same command will load cached tiles instead of
-        # reprocessing them. Cache is cleaned up after successful completion.
-        tile_cache_dir = output_dir / "_tile_cache"
-        tile_cache_dir.mkdir(exist_ok=True)
-        cached_count = 0
-
         if debug_mode:
             print(f"[DEBUG] Starting tile loop...", flush=True)
 
@@ -200,30 +193,6 @@ class Pipeline:
                     print(f"[DEBUG] Loading first tile...", flush=True)
                     print(f"[DEBUG] VRAM before first tile: {_get_vram()} MB", flush=True)
                 tile_idx = row * n_cols + col + 1
-
-                # Check tile cache for resume
-                cache_file = tile_cache_dir / f"{row}_{col}.npz"
-                if cache_file.exists():
-                    cached = np.load(str(cache_file))
-                    tile_labels = cached["labels"]
-                    mosaic_writer.write_tile(tile_labels, row, col)
-                    tile_max = int(tile_labels.max()) if tile_labels.max() > 0 else 0
-                    if tile_max > label_offset:
-                        label_offset = tile_max
-                    cached_count += 1
-                    if verbose and cached_count == 1:
-                        print(f"  Resuming from cache ({tile_cache_dir})...")
-                    if verbose and (cached_count <= 3 or tile_idx == total_tiles):
-                        print(f"  Tile {tile_idx:3d}/{total_tiles} [{row},{col}] | CACHED")
-                    elif verbose and cached_count == 4:
-                        print(f"  ... (loading cached tiles)")
-                    continue
-
-                # Print summary when transitioning from cached to processing
-                if cached_count > 0 and verbose:
-                    print(f"  Loaded {cached_count} cached tiles. Resuming processing...")
-                    tile_start_time = time.time()  # Reset ETA timer
-                    cached_count = -1  # Prevent re-printing
 
                 # Load tile
                 tile_info = load_tile(
@@ -264,9 +233,6 @@ class Pipeline:
                         start_label=label_offset + 1
                     )
 
-                # Save tile to cache for resume
-                np.savez_compressed(str(cache_file), labels=result.labels)
-
                 # Write tile to mosaic
                 mosaic_writer.write_tile(result.labels, row, col)
                 label_offset = int(result.labels.max()) if result.labels.max() > 0 else label_offset
@@ -288,7 +254,7 @@ class Pipeline:
 
                 if verbose:
                     elapsed = time.time() - tile_start_time
-                    tiles_processed = tile_idx - max(0, cached_count)
+                    tiles_processed = tile_idx
                     avg_time = elapsed / max(tiles_processed, 1)
                     remaining = total_tiles - tile_idx
                     eta = avg_time * remaining
@@ -307,7 +273,7 @@ class Pipeline:
                 # Scale reset frequency with tile count: every 50 for 500+ tiles,
                 # every 100 otherwise. Small tile_size jobs generate more passes
                 # per tile, accumulating more GPU memory fragmentation.
-                reset_interval = 25 if total_tiles >= 1000 else (50 if total_tiles >= 500 else 100)
+                reset_interval = 10 if total_tiles >= 500 else (25 if total_tiles >= 100 else 50)
                 if tile_idx % reset_interval == 0:
                     self._predictor.unload_model()
                     gc.collect()
@@ -324,13 +290,6 @@ class Pipeline:
         gc.collect()
         torch.cuda.empty_cache()
 
-        # Clean up tile cache after successful completion
-        import shutil
-        if tile_cache_dir.exists():
-            shutil.rmtree(tile_cache_dir)
-            if verbose:
-                print(f"  Tile cache cleaned up.")
-
         # Post-processing
         if verbose:
             print("-" * 60)
@@ -340,14 +299,18 @@ class Pipeline:
         mosaic = mosaic_writer.read()
 
         # Merge enclosed regions + remove small (combined for efficiency - single ndimage.label)
-        t0 = time.time()
-        mosaic = merge_enclosed_and_remove_small(
-            mosaic,
-            merge_enclosed_max_area=self.config.merge.merge_enclosed_max_area,
-            remove_small_min_area=self.config.merge.min_mask_area
-        )
-        if verbose:
-            print(f"  Merge enclosed + remove small: done ({time.time()-t0:.1f}s)", flush=True)
+        if self.config.merge.merge_strategy == "none":
+            if verbose:
+                print("  Merge enclosed + remove small: skipped (strategy=none)", flush=True)
+        else:
+            t0 = time.time()
+            mosaic = merge_enclosed_and_remove_small(
+                mosaic,
+                merge_enclosed_max_area=self.config.merge.merge_enclosed_max_area,
+                remove_small_min_area=self.config.merge.min_mask_area
+            )
+            if verbose:
+                print(f"  Merge enclosed + remove small: done ({time.time()-t0:.1f}s)", flush=True)
 
         # Calculate segment counts BEFORE merge
         segment_counts_before = np.bincount(mosaic.ravel())
@@ -357,17 +320,22 @@ class Pipeline:
         mosaic_before_merge = mosaic.copy() if self.config.output.save_labels else None
 
         # Merge at discontinuities
-        t0 = time.time()
-        mosaic, merge_stats = merge_at_discontinuities(
-            mosaic,
-            tile_size,
-            min_contact=self.config.merge.min_contact_pixels,
-            merge_strategy=self.config.merge.merge_strategy,
-            return_stats=True
-        )
-        if verbose:
-            print(f"  Merge at edges: done ({time.time()-t0:.1f}s) "
-                  f"[{merge_stats['labels_merged']} labels merged]", flush=True)
+        if self.config.merge.merge_strategy == "none":
+            merge_stats = {"labels_merged": 0, "pairs_checked": 0}
+            if verbose:
+                print("  Merge at edges: skipped (strategy=none)", flush=True)
+        else:
+            t0 = time.time()
+            mosaic, merge_stats = merge_at_discontinuities(
+                mosaic,
+                tile_size,
+                min_contact=self.config.merge.min_contact_pixels,
+                merge_strategy=self.config.merge.merge_strategy,
+                return_stats=True
+            )
+            if verbose:
+                print(f"  Merge at edges: done ({time.time()-t0:.1f}s) "
+                      f"[{merge_stats['labels_merged']} labels merged]", flush=True)
 
         # Calculate final stats (segment_counts_before already computed above)
         segment_counts = np.bincount(mosaic.ravel())

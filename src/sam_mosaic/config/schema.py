@@ -181,8 +181,8 @@ class Config:
             raise ValueError(f"segmentation.point_strategy must be 'kmeans' or 'dense_grid', got {self.segmentation.point_strategy}")
         if self.segmentation.erosion_iterations < 0:
             raise ValueError(f"segmentation.erosion_iterations must be non-negative, got {self.segmentation.erosion_iterations}")
-        if self.merge.merge_strategy not in ("best_match", "mutual_best", "min_contact"):
-            raise ValueError(f"merge.merge_strategy must be 'mutual_best' or 'min_contact', got {self.merge.merge_strategy}")
+        if self.merge.merge_strategy not in ("best_match", "mutual_best", "min_contact", "none"):
+            raise ValueError(f"merge.merge_strategy must be 'best_match', 'mutual_best', 'min_contact', or 'none', got {self.merge.merge_strategy}")
         if self.output.streaming_mode not in ("auto", "ram", "disk"):
             raise ValueError(f"output.streaming_mode must be 'auto', 'ram', or 'disk', got {self.output.streaming_mode}")
 
