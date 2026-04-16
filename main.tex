@@ -271,17 +271,17 @@ Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
 \caption{Evaluation metrics.}
 \label{tab:metrics}
 \scriptsize
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llp{9cm}}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lp{11cm}}
 \toprule
-Metric & Scope & Description \\
+Metric & Description \\
 \midrule
-Coverage (\%) & Scene & Fraction of image pixels assigned to any segment \\
-ASA \citep{stutz2018superpixels} & Scene & Fraction of pixels correctly labeled when each segment receives its majority GT class \\
-Det@0.5 (\%) & Object & Fraction of GT objects reconstructed with greedy oracle IoU $\geq 0.5$ \\
-SS-Det@0.5 (\%) & Object & Fraction of GT objects matched by a single segment with IoU $\geq 0.5$ \\
-mIoU & Object & Mean greedy oracle IoU across all GT objects \\
-$\bar{n}$ & Object & Mean segments per GT object (over-segmentation indicator) \\
-BIoU \citep{cheng2021boundary} & Object & IoU restricted to a $d = 3$ pixel band around boundaries \\
+Coverage (\%) & Fraction of image pixels assigned to any segment \\
+ASA \citep{stutz2018superpixels} & Fraction of pixels correctly labeled when each segment receives its majority GT class \\
+Det@0.5 (\%) & Fraction of GT objects reconstructed with greedy oracle IoU $\geq 0.5$ \\
+SS-Det@0.5 (\%) & Fraction of GT objects matched by a single segment with IoU $\geq 0.5$ \\
+mIoU & Mean greedy oracle IoU across all GT objects \\
+$\bar{n}$ & Mean segments per GT object (over-segmentation indicator) \\
+BIoU \citep{cheng2021boundary} & IoU restricted to a $d = 3$ pixel band around boundaries \\
 \bottomrule
 \end{tabular*}
 \end{table}
