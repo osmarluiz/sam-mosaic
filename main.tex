@@ -286,7 +286,7 @@ BIoU \citep{cheng2021boundary} & IoU restricted to a $d = 3$ pixel band around b
 \end{tabular*}
 \end{table}
 
-\subsubsection{Ablation Studies}
+The following ablation studies isolate the contribution of each pipeline component:
 
 \begin{itemize}
     \item \textit{Multi-pass contribution:} single-pass SAM2 at $\tau = 0.93$, $0.88$, $0.70$ vs.\ full pipeline.
@@ -297,7 +297,7 @@ BIoU \citep{cheng2021boundary} & IoU restricted to a $d = 3$ pixel band around b
     \item \textit{Merge strategy:} best-match vs.\ naive across all seven scenes.
 \end{itemize}
 
-\subsubsection{Quality Evaluation} Beyond coverage, the evaluation asks whether the resulting segments are useful: do they align with real objects, respect class boundaries, and outperform traditional alternatives? At the best tile size per scene, segmentation quality is assessed per class using the greedy oracle protocol and ASA. Remote SAMsing is then compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. Finally, a scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels) to verify that quality does not degrade with image size.
+Beyond coverage, the evaluation asks whether the resulting segments are useful: do they align with real objects, respect class boundaries, and outperform traditional alternatives? At the best tile size per scene, segmentation quality is assessed per class using the greedy oracle protocol and ASA. Remote SAMsing is then compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. Finally, a scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels) to verify that quality does not degrade with image size.
 
 % ============================================================================
 \section{Results}
