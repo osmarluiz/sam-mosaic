@@ -396,7 +396,7 @@ Smaller tiles do not improve quality on all scenes. On Plant23, BIoU drops from 
 \label{sec:res_merge}
 % ----------------------------------------------------------------------------
 
-Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The naive baseline merges all segment pairs sharing contact across a tile boundary, propagating merges transitively through Union-Find. On BSB-1, the naive approach fuses multiple buildings and vegetation areas into a single segment spanning the tile corner; on Potsdam-1, 83\% of the crop collapses into a single mega-segment. The best-match strategy requires each segment to commit to exactly one merge partner, the neighbor with the highest contact area, avoiding these spurious fusions.
+The merge strategy determines whether tiled segmentation preserves object identity or collapses into unusable mega-segments (Fig.~\ref{fig:merge}). A naive baseline that merges all touching segment pairs propagates fusions transitively: on BSB-1, multiple buildings and vegetation areas collapse into a single segment spanning the tile corner, and on Potsdam-1, 83\% of the crop fuses into one mega-segment. The best-match strategy avoids this by requiring each segment to commit to exactly one merge partner, the neighbor with the highest contact area.
 
 \begin{figure}[htbp]
     \centering
@@ -405,7 +405,9 @@ Fig.~\ref{fig:merge} compares the naive and best-match merge strategies. The nai
     \label{fig:merge}
 \end{figure}
 
-Best-match merge produces 10--20\% fewer merges than naive across all seven scenes, preserving 3--7\% more distinct segments (Table~\ref{tab:merge_strategy}). The largest absolute gain occurs on BSB-2, where best-match preserves 401 additional segments. Fig.~\ref{fig:padding} illustrates the effect of contextual padding on boundary segmentation. Without padding, segments terminate at tile edges with different labels on each side; the merge algorithm cannot unify them. With padding, objects are segmented continuously across tile edges, enabling correct merges.
+Across all seven scenes, best-match produces 10--20\% fewer merges than naive, preserving 3--7\% more distinct segments (Table~\ref{tab:merge_strategy}).
+
+Contextual padding is equally important (Fig.~\ref{fig:padding}). Without padding, segments terminate before tile edges and the merge algorithm has no contact to work with. With padding, objects are segmented continuously across tile edges, enabling correct merges.
 
 \begin{table}[htbp]
 \centering
