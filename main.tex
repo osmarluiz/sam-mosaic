@@ -269,19 +269,19 @@ Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
 \centering
 \caption{Evaluation metrics.}
 \label{tab:metrics}
-\begin{tabular}{llp{6.5cm}}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llp{9cm}}
 \toprule
 Metric & Scope & Description \\
 \midrule
-Coverage (\%) & Scene & Pixels assigned to any segment \\
-ASA \citep{stutz2018superpixels} & Scene & Pixels correct when each segment receives its majority GT class \\
-Det@0.5 (\%) & Object & GT objects with greedy oracle IoU $\geq 0.5$ \\
-SS-Det@0.5 (\%) & Object & GT objects matched by a single segment (IoU $\geq 0.5$) \\
-mIoU & Object & Mean greedy oracle IoU \\
-$\bar{n}$ & Object & Mean segments per object \\
-BIoU \citep{cheng2021boundary} & Object & IoU in a $d = 3$\,px band around boundaries \\
+Coverage (\%) & Scene & Fraction of image pixels assigned to any segment \\
+ASA \citep{stutz2018superpixels} & Scene & Fraction of pixels correctly labeled when each segment receives its majority GT class \\
+Det@0.5 (\%) & Object & Fraction of GT objects reconstructed with greedy oracle IoU $\geq 0.5$ \\
+SS-Det@0.5 (\%) & Object & Fraction of GT objects matched by a single segment with IoU $\geq 0.5$ \\
+mIoU & Object & Mean greedy oracle IoU across all GT objects \\
+$\bar{n}$ & Object & Mean segments per GT object (over-segmentation indicator) \\
+BIoU \citep{cheng2021boundary} & Object & IoU restricted to a $d = 3$ pixel band around boundaries \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 \textbf{Ablation studies.}
