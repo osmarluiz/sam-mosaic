@@ -211,7 +211,7 @@ The evaluation uses seven scenes from three datasets spanning different sensors,
 \centering
 \caption{Overview of datasets used in the experiments. Tile counts refer to the default tile size of $1000 \times 1000$~pixels.}
 \label{tab:datasets}
-\begin{tabular}{llllrrl}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llllrrl}
 \toprule
 Dataset & Sensor & Composition & Res.\ (m) & Scenes & Size (px) & Tiles \\
 \midrule
@@ -219,7 +219,7 @@ ISPRS Potsdam & Aerial & RGB natural & 0.05 & 3 & 6{,}000$^2$ & 36 \\
 Bras\'{i}lia & Aerial & RGB natural & 0.24 & 3 & 8{,}000$^2$ & 64 \\
 Plant23 & Planet & MNF false-color & 4.78 & 1 & 10{,}000$^2$ & 100 \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 \textbf{ISPRS Potsdam.} Three patches (3\_13, 5\_12, 5\_13) from the ISPRS 2D Semantic Labeling Contest \citep{rottensteiner2014isprs}, covering a dense European urban landscape at 5~cm GSD. At this resolution, objects are highly detailed but amorphous land cover classes (low vegetation, impervious surfaces) challenge boundary delineation. Public semantic ground truth includes six classes: impervious surfaces, buildings, low vegetation, trees, cars, and clutter.
@@ -238,7 +238,7 @@ All experiments use the SAM2.1 model with the Hiera Large backbone, the largest 
 \caption{Default pipeline configuration parameters.}
 \label{tab:default_config}
 \scriptsize
-\begin{tabular}{llrl}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llrl}
 \toprule
 Module & Parameter & Default & Description \\
 \midrule
@@ -258,7 +258,7 @@ Merge & Strategy & best\_match & Parameter-free best-match \\
 Post-proc. & $a_{\min}$ (min\_mask\_area) & 100 & Min.\ segment area (pixels) \\
            & merge\_enclosed\_max & 500 & Max.\ area for enclosed absorption \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 \subsection{Experimental Design}
@@ -325,7 +325,7 @@ Single-pass SAM2 at the highest quality threshold ($\tau = 0.93$) covers only 30
 \caption{Pipeline configuration analysis: coverage (\%), processing time (seconds), detection rate at IoU $\geq 0.5$ (Det@0.5, \%), and Boundary IoU (BIoU) across three scenes. All configurations use Dense Grid point sampling.}
 \label{tab:config}
 \scriptsize
-\begin{tabular}{l@{\hspace{6pt}}rrrr@{\hspace{8pt}}rrrr@{\hspace{8pt}}rrrr}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l@{\hspace{6pt}}rrrr@{\hspace{8pt}}rrrr@{\hspace{8pt}}rrrr}
 \toprule
  & \multicolumn{4}{c}{BSB-1 (24~cm)} & \multicolumn{4}{c}{Potsdam-1 (5~cm)} & \multicolumn{4}{c}{Plant23 (4.78~m)} \\
 \cmidrule(lr){2-5} \cmidrule(lr){6-9} \cmidrule(lr){10-13}
@@ -354,7 +354,7 @@ All components & 91.5 & 13{,}065 & 56.0 & .199 & 97.1 & 2{,}549 & 61.9 & .175 & 
 $T = 500$ & 96.9 & 24{,}872 & 73.2 & .329 & 98.8 & 5{,}896 & 55.9 & .172 & 99.1 & 6{,}988 & 82.5 & .470 \\
 $T = 250$ & 97.8 & 66{,}253 & 85.1 & .543 & 99.2 & 11{,}851 & 49.5 & .164 & 99.4 & 22{,}252 & 74.6 & .407 \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 \begin{figure}[htbp]
@@ -409,7 +409,7 @@ Contextual padding is equally important (Fig.~\ref{fig:padding}). Without paddin
 \centering
 \caption{Boundary merge comparison (Dense Grid, $T = 1{,}000$). Coverage is identical; segment count and merge count differ.}
 \label{tab:merge_strategy}
-\begin{tabular}{lrrrrr}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lrrrrr}
 \toprule
  & \multicolumn{2}{c}{Naive} & \multicolumn{2}{c}{Best-match} & \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-5}
@@ -423,7 +423,7 @@ BSB-2     & 10{,}584 & 2{,}425 & 10{,}985 & 1{,}994 & +401 \\
 BSB-3     & 10{,}197 & 2{,}242 & 10{,}535 & 1{,}867 & +338 \\
 Plant23   & 3{,}944 & 1{,}659 & 4{,}094 & 1{,}487 & +150 \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 
@@ -448,7 +448,7 @@ Per-class evaluation at the best tile size per scene (Table~\ref{tab:perobject})
 \caption{Per-class evaluation using the greedy oracle protocol. Metrics defined in Table~\ref{tab:metrics}.}
 \label{tab:perobject}
 \scriptsize
-\begin{tabular}{lrrrrrrr}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lrrrrrrr}
 \toprule
 Class & $n$ & Det@0.5 & SS-Det & mIoU & BIoU & ASA & $\bar{n}$ \\
 \midrule
@@ -488,7 +488,7 @@ Crop fields & 2{,}758 & 95.2 & 94.8 & 0.945 & 0.881 & 99.6 & 1.0 \\
 Lakes       &      73 & 89.0 & 89.0 & 0.888 & 0.773 & 94.0 & 1.2 \\
 \textit{Global} & \textit{3{,}339} & \textit{95.8} & \textit{95.4} & \textit{0.951} & \textit{0.894} & \textit{99.5} & --- \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 Discrete objects with well-defined shapes achieve high detection: buildings 95\% Det@0.5 on both BSB-1 and Potsdam-1, cars 82--93\%, and agricultural fields 95--100\% with near-perfect one-segment-per-object correspondence ($\bar{n} \approx 1.0$). On Plant23, pivot irrigation fields reach 100\% Det@0.5 with BIoU 0.98 despite the MNF false-color composition.
@@ -515,7 +515,7 @@ To test whether SAM2-based segments are genuinely better than traditional altern
 \caption{Baseline comparison (greedy oracle protocol). Det = Det@0.5 (\%), IoU = mean greedy oracle IoU, BIoU = Boundary IoU. Best per class in bold. SLIC: compactness = 10, $n$ = 27{,}000 / 2{,}400 / 3{,}500 (BSB-1 / Potsdam-1 / Plant23). Felzenszwalb: $\sigma = 0.5$, min\_size = 50, scale = 1{,}569 / 5{,}739 / 5{,}061. Parameters calibrated to approximate Remote SAMsing's segment count per dataset.}
 \label{tab:baselines}
 \scriptsize
-\begin{tabular}{lrrrrrrrrrrrrr}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lrrrrrrrrrrrrr}
 \toprule
  & \multicolumn{3}{c}{SamGeo2} & \multicolumn{3}{c}{SLIC} & \multicolumn{3}{c}{Felzenszwalb} & \multicolumn{3}{c}{Remote SAMsing} \\
 \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-13}
@@ -551,7 +551,7 @@ Crops     & 19.1 & .189 & .135 & 53.4 & .541 & .128 & 30.9 & .451 & .104 & \text
 Lakes     & 23.3 & .227 & .144 & 35.6 & .464 & .076 & 64.4 & .642 & .226 & \textbf{89.0} & \textbf{.888} & \textbf{.773} \\
 \textit{Global} & \textit{29.2} & \textit{.289} & \textit{.206} & \textit{59.7} & \textit{.578} & \textit{.140} & \textit{41.0} & \textit{.487} & \textit{.111} & \textit{\textbf{95.8}} & \textit{\textbf{.951}} & \textit{\textbf{.894}} \\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 Remote SAMsing achieves the highest Det@0.5, mIoU, and BIoU on all evaluated classes across all three datasets. The BIoU gap is the most revealing: Remote SAMsing reaches 0.18--0.89 globally, while SLIC, Felzenszwalb, and SamGeo2 remain below 0.21, confirming that SAM2's learned representations place boundaries along object contours rather than spectral gradients. SamGeo2 achieves only 7--29\% Det@0.5 without the multi-pass pipeline, SLIC cannot resolve small objects (2.0\% Det@0.5 for cars on BSB-1), and Felzenszwalb follows spectral similarity rather than object structure (global BIoU 0.07--0.14).
