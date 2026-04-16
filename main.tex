@@ -297,14 +297,14 @@ BIoU \citep{cheng2021boundary} & IoU restricted to a $d = 3$ pixel band around b
     \item \textit{Merge strategy:} best-match vs.\ naive across all seven scenes.
 \end{itemize}
 
-\subsubsection{Quality Evaluation} At the best tile size per scene, segmentation quality is assessed per class. Remote SAMsing is compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. A scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels).
+\subsubsection{Quality Evaluation} Beyond coverage, the evaluation asks whether the resulting segments are useful: do they align with real objects, respect class boundaries, and outperform traditional alternatives? At the best tile size per scene, segmentation quality is assessed per class using the greedy oracle protocol and ASA. Remote SAMsing is then compared against SLIC \citep{achanta2012slic} and Felzenszwalb \citep{felzenszwalb2004efficient}, calibrated to approximate Remote SAMsing's segment count per dataset. Finally, a scalability test applies the full pipeline to a $36{,}000 \times 54{,}000$ pixel Potsdam mosaic (1.94 billion pixels) to verify that quality does not degrade with image size.
 
 % ============================================================================
 \section{Results}
 \label{sec:results}
 % ============================================================================
 
-Fig.~\ref{fig:full_segmentation} presents the complete segmentation output for the three representative scenes, illustrating the coverage and granularity achievable across different spatial resolutions and landscape types. The following subsections analyze how pipeline configuration affects coverage and detection quality (Section~\ref{sec:res_config}), validate the boundary merge algorithm (Section~\ref{sec:res_merge}), evaluate per-class segmentation quality (Section~\ref{sec:res_quality}), compare against traditional baselines (Section~\ref{sec:res_baselines}), and test scalability on a full mosaic (Section~\ref{sec:res_scalability}).
+Fig.~\ref{fig:full_segmentation} shows the end result: three scenes that SAM2 alone would leave mostly unsegmented are now covered at 97--98\% with segments that follow individual objects rather than arbitrary pixel boundaries. The remainder of this section examines how each pipeline component contributes to this result, whether the boundary merge preserves object identity across tiles, how segment quality compares to traditional methods, and whether the pipeline scales to production-sized images.
 
 \begin{figure}[p]
     \centering
