@@ -6,7 +6,7 @@ Segment large remote sensing images (satellite, aerial, drone) that exceed GPU m
 
 Tested on 7 scenes spanning 5 cm to 4.78 m GSD, two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural), including a scalability test on a 36,000 x 54,000 pixel mosaic (1.94 billion pixels).
 
-> **Paper:** O. L. F. de Carvalho, O. A. de Carvalho Junior, A. O. de Albuquerque, and D. Guerreiro e Silva, "Remote SAMsing: From Segment Anything to Segment Everything," *Int. J. Applied Earth Observation and Geoinformation*, 2026.
+> **Paper:** O. L. F. de Carvalho, O. A. de Carvalho Junior, A. O. de Albuquerque, and D. Guerreiro e Silva, "Remote SAMsing: From Segment Anything to Segment Everything," *arXiv preprint arXiv:2605.00256*, 2026. [[arXiv]](https://arxiv.org/abs/2605.00256)
 
 ## Features
 
@@ -422,9 +422,9 @@ If you use this software in your research, please cite:
 @article{carvalho2026remotesamsing,
   title = {Remote {SAMsing}: From Segment Anything to Segment Everything},
   author = {de Carvalho, Osmar Luiz Ferreira and de Carvalho J{\'u}nior, Osmar Ab{\'i}lio and de Albuquerque, Anesmar Olino and Guerreiro e Silva, Daniel},
-  journal = {International Journal of Applied Earth Observation and Geoinformation},
+  journal = {arXiv preprint arXiv:2605.00256},
   year = {2026},
-  url = {https://github.com/osmarluiz/sam-mosaic}
+  url = {https://arxiv.org/abs/2605.00256}
 }
 ```
 
