@@ -2,6 +2,11 @@
 
 **From Segment Anything to Segment Everything**
 
+[![arXiv](https://img.shields.io/badge/arXiv-2605.00256-b31b1b.svg)](https://arxiv.org/abs/2605.00256)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Cite](https://img.shields.io/badge/Cite-CITATION.cff-green.svg)](CITATION.cff)
+
 Segment large remote sensing images (satellite, aerial, drone) that exceed GPU memory by processing them in tiles and intelligently merging the results. Built on SAM2, the `sam-mosaic` package achieves 91--98% coverage across diverse scenes without any model fine-tuning or manual annotation.
 
 Tested on 7 scenes spanning 5 cm to 4.78 m GSD, two spectral compositions (natural RGB and MNF false-color), and two landscape types (urban and agricultural), including a scalability test on a 36,000 x 54,000 pixel mosaic (1.94 billion pixels).

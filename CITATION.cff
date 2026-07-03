@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "sam-mosaic (Remote SAMsing)"
+version: 2.0.0
+license: MIT
+repository-code: "https://github.com/osmarluiz/sam-mosaic"
+authors:
+  - family-names: "Ferreira de Carvalho"
+    given-names: "Osmar Luiz"
+preferred-citation:
+  type: article
+  title: "Remote SAMsing: From Segment Anything to Segment Everything"
+  authors:
+    - family-names: "Ferreira de Carvalho"
+      given-names: "Osmar Luiz"
+    - family-names: "de Carvalho Junior"
+      given-names: "Osmar Abilio"
+    - family-names: "Olino de Albuquerque"
+      given-names: "Anesmar"
+    - family-names: "Guerreiro e Silva"
+      given-names: "Daniel"
+  year: 2026
+  journal: "arXiv preprint arXiv:2605.00256"
+  doi: "10.48550/arXiv.2605.00256"
+  url: "https://arxiv.org/abs/2605.00256"
